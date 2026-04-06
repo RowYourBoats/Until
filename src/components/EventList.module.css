@@ -1,0 +1,1079 @@
+.container {
+  max-width: 500px;
+  width: 100%;
+  background: var(--background);
+  letter-spacing: normal;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 20px;
+}
+
+.currentDate {
+  font-size: 1.15rem;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 2rem;
+  padding-top: 20px;
+  padding-bottom: 10px;
+}
+
+.tabBtn {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 1.15rem;
+  cursor: pointer;
+  padding: 0;
+  color: var(--text-secondary);
+  font-weight: 400;
+  transition: color 0.2s;
+}
+
+.tabActive {
+  color: var(--foreground);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 2px;
+}
+
+.textBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  font-size: 1.15rem;
+  color: var(--foreground);
+  font-weight: 400;
+}
+
+.addButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  color: var(--foreground);
+}
+
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.filterBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 1.15rem;
+  color: var(--text-secondary);
+}
+
+.filterActive {
+  color: var(--foreground);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.section {
+  padding-top: 20px;
+  padding-bottom: 20px;
+}
+
+.sectionTitle {
+  font-size: 1.15rem;
+  font-weight: 500;
+  color: var(--accent-red);
+  margin-bottom: 10px;
+}
+
+.section + .section {
+  padding-top: 0;
+}
+
+.itemWrapper {
+  margin-bottom: 18px;
+}
+
+.item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  cursor: pointer;
+  gap: 1.5rem;
+}
+
+.itemMain {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  align-items: flex-start;
+}
+
+.eventNameGroup {
+  flex: 1;
+  min-width: 0;
+}
+
+.eventName {
+  font-size: 1.15rem;
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--foreground);
+}
+
+.archivedName {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+
+.nextActionRow {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: 0;
+}
+
+.nextActionHyphen {
+  font-size: 1.15rem;
+  font-style: italic;
+  color: var(--foreground);
+  flex-shrink: 0;
+}
+
+.nextActionInline {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 1.15rem;
+  font-style: italic;
+  color: var(--foreground);
+  padding: 0;
+  outline: none;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nextActionInline::placeholder {
+  color: var(--foreground);
+  font-style: italic;
+  opacity: 1;
+}
+
+.nextActionInline:focus {
+  color: var(--foreground);
+}
+
+.nextActionInline:focus::placeholder {
+  opacity: 0.4;
+}
+
+.dateGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  min-width: fit-content;
+}
+
+.daysUntil {
+  font-size: 1.15rem;
+  color: var(--foreground);
+  line-height: 1.1;
+}
+
+.weekdayLabel {
+  font-size: 1.15rem;
+  color: var(--text-secondary);
+  line-height: 1.1;
+}
+
+.editBtn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px 0 0 4px;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+
+.editBtn:hover {
+  color: var(--foreground);
+  opacity: 1;
+}
+
+.description {
+  padding: 0.5rem 0 1.5rem 0;
+  font-size: 1.15rem;
+  color: var(--foreground);
+}
+
+.detailsRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+  font-size: 1.15rem;
+}
+
+.link {
+  color: var(--foreground);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.descText {
+  margin-top: 0.75rem;
+  line-height: 1.4;
+  color: var(--foreground);
+}
+
+.todoListDisplay {
+  margin: 1.5rem 0;
+}
+
+.todoListTitle {
+  font-size: 1.15rem;
+  font-weight: 500;
+  margin-bottom: 0.75rem;
+}
+
+.todoItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.15rem;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+}
+
+.checkbox {
+  width: 1.15rem;
+  height: 1.15rem;
+  cursor: pointer;
+  accent-color: var(--foreground);
+}
+
+.completedTodo {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+
+.itemTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.tagLabel {
+  font-size: 1.15rem;
+  font-weight: 500;
+}
+
+.tag-grants { color: var(--tag-grants); }
+.tag-exhibitions { color: var(--tag-exhibitions); }
+.tag-competitions { color: var(--tag-competitions); }
+.tag-submissions { color: var(--tag-submissions); }
+.tag-residencies { color: var(--tag-residencies); }
+.tag-images { color: var(--tag-images); }
+.tag-text { color: var(--tag-text); }
+
+.archiveActions {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+}
+
+.completeBtn, .incompleteBtn, .deleteBtn {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 1.15rem;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  color: var(--foreground);
+}
+
+.deleteBtn {
+  color: #c44;
+}
+
+.statusBadge {
+  margin-top: 1.5rem;
+  font-size: 1.15rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.completed { color: var(--tag-grants); }
+.incomplete { color: var(--tag-competitions); }
+
+/* Form Styling */
+.addForm {
+  background: none;
+  padding: 0;
+  margin-bottom: 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.formHeader {
+  font-size: 1.15rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: var(--foreground);
+}
+
+.input, .textarea {
+  width: 100%;
+  padding: 0.5rem 0;
+  border: none;
+  border-bottom: 1px solid var(--foreground);
+  background: none;
+  font-family: inherit;
+  font-size: 1.15rem;
+  outline: none;
+  color: var(--foreground);
+}
+
+.input:focus, .textarea:focus {
+  border-bottom-color: var(--foreground);
+}
+
+.textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.todoSection {
+  margin: 1rem 0;
+  padding-top: 1rem;
+}
+
+.todoHeader {
+  font-size: 1.15rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+  color: var(--foreground);
+}
+
+.todoFormItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1.15rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-secondary);
+}
+
+.removeTodoBtn {
+  background: none;
+  border: none;
+  color: var(--tag-competitions);
+  cursor: pointer;
+}
+
+.addTodoRow {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.todoInput {
+  flex: 1;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--foreground);
+  font-family: inherit;
+  font-size: 1.15rem;
+  outline: none;
+  color: var(--foreground);
+}
+
+.addTodoBtn {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 1.15rem;
+  text-decoration: underline;
+  cursor: pointer;
+  color: var(--foreground);
+}
+
+.tagSelector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.tagButton {
+  background: none;
+  border: 1px solid var(--foreground);
+  padding: 4px 12px;
+  font-size: 1.15rem;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text-secondary);
+}
+
+.tagActive {
+  background: var(--foreground);
+  color: var(--background);
+  border-color: var(--foreground);
+}
+
+.formActions {
+  display: flex;
+  gap: 2rem;
+  margin-top: 1rem;
+}
+
+.cancelButton, .submitButton {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 1.15rem;
+  text-decoration: underline;
+  text-underline-offset: 5px;
+  color: var(--foreground);
+}
+
+.submitButton {
+  font-weight: 500;
+}
+
+.empty {
+  padding: 1.5rem 0;
+  color: var(--text-secondary);
+  font-size: 1.15rem;
+}
+
+/* Minimize Icon */
+.minimizeIcon {
+  font-size: 1.15rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+/* Pomodoro Section */
+.pomodoroSection {
+  padding-top: 10px;
+  padding-bottom: 20px;
+}
+
+.pomodoroHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 10px;
+}
+
+.pomodoroTitle {
+  font-size: 1.15rem;
+  font-weight: 500;
+  color: var(--accent-red);
+}
+
+.pomodoroTime {
+  font-size: 1.15rem;
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.pomodoroDuration {
+  color: var(--text-secondary);
+  opacity: 0.4;
+}
+
+.pomodoroCompletedAt {
+  color: var(--accent-red);
+  opacity: 0.7;
+  font-size: 0.85em;
+}
+
+.pomodoroTimeline {
+  position: relative;
+  padding: 8px 0;
+}
+
+.pomodoroTrack {
+  height: 2px;
+  background: var(--foreground);
+  opacity: 0.15;
+  position: relative;
+  width: 100%;
+}
+
+.pomodoroFill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--foreground);
+  opacity: 1;
+  transition: width 1s linear;
+}
+
+.pomodoroTrackActive {
+  background: var(--accent-red);
+  opacity: 1;
+}
+
+.pomodoroFillActive {
+  background: var(--foreground);
+  opacity: 0.15;
+}
+
+.pomodoroComplete {
+  background: var(--accent-red);
+}
+
+.pomodoroMarker {
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  background: var(--foreground);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: left 1s linear;
+}
+
+.pomodoroTicks {
+  position: relative;
+  height: 6px;
+}
+
+.pomodoroTick {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 4px;
+  background: var(--foreground);
+  opacity: 0.15;
+}
+
+.pomodoroTaskLabel {
+  font-size: 1.15rem;
+  font-style: italic;
+  color: var(--foreground);
+  padding: 4px 0;
+}
+
+.pomodoroControls {
+  display: flex;
+  gap: 2rem;
+  padding-top: 6px;
+}
+
+.pomodoroSelectActive {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.pomodoroTaskList {
+  padding-top: 8px;
+}
+
+.pomodoroTaskOption {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  font-family: inherit;
+  font-size: 1.15rem;
+  padding: 0.35rem 0;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: color 0.15s;
+}
+
+.pomodoroTaskOption:hover {
+  color: var(--foreground);
+}
+
+.pomodoroTaskSelected {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.pomodoroEventName {
+  font-weight: 500;
+}
+
+.pomodoroLabelSep {
+  color: var(--text-secondary);
+  opacity: 0.4;
+}
+
+.pomodoroGroupLabel {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  padding: 0.5rem 0 0.15rem 0;
+  text-transform: lowercase;
+}
+
+.pomodoroCreateRow {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.pomodoroCreateInput {
+  flex: 1;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--foreground);
+  font-family: inherit;
+  font-size: 1.15rem;
+  padding: 0.35rem 0;
+  outline: none;
+  color: var(--foreground);
+}
+
+.pomodoroCreateInput::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.5;
+}
+
+.pomodoroSubtasks {
+  padding-left: 1rem;
+}
+
+.pomodoroSubtaskOption {
+  font-style: italic;
+}
+
+.pomodoroEmpty {
+  font-size: 1.15rem;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  padding: 0.35rem 0;
+}
+
+/* Daily Tasks */
+.dailyTasksSection {
+  padding-top: 20px;
+  padding-bottom: 20px;
+}
+
+.dateNav {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  padding-bottom: 10px;
+}
+
+.dateNavBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  font-size: 1.15rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+  transition: color 0.2s;
+}
+
+.dateNavBtn:hover {
+  color: var(--foreground);
+}
+
+.dateNavActive {
+  color: var(--foreground);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 2px;
+}
+
+.dateNavLabel {
+  font-size: 1.15rem;
+  font-weight: 500;
+  color: var(--foreground);
+  flex: 1;
+}
+
+.todayBtn {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.2s;
+}
+
+.todayBtn:hover {
+  color: var(--foreground);
+}
+
+.taskRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  position: relative;
+}
+
+.taskRow:hover .taskActions {
+  opacity: 1;
+}
+
+.taskCheckbox {
+  width: 1.15rem;
+  height: 1.15rem;
+  cursor: pointer;
+  accent-color: var(--foreground);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.taskContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.taskText {
+  font-size: 1.15rem;
+  color: var(--foreground);
+  line-height: 1.4;
+}
+
+.taskTextCompleted {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+
+.taskLinkedEvent {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 1px;
+}
+
+.taskActions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.taskActionBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+
+.taskActionBtn:hover {
+  color: var(--foreground);
+}
+
+.dailyTaskInput {
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--foreground);
+  font-family: inherit;
+  font-size: 1.15rem;
+  padding: 0.5rem 0;
+  outline: none;
+  color: var(--foreground);
+  margin-top: 0.5rem;
+}
+
+.dailyTaskInput::placeholder {
+  color: var(--text-secondary);
+}
+
+.dailyTaskInput:focus {
+  border-bottom-color: var(--foreground);
+}
+
+.clearCompletedBtn {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-style: italic;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.4rem 0;
+  margin-top: 0.25rem;
+}
+
+.linkDropdownWrapper {
+  position: relative;
+}
+
+.linkDropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: var(--background);
+  border: 1px solid var(--foreground);
+  min-width: 200px;
+  max-height: 180px;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.linkDropdownItem {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  font-family: inherit;
+  font-size: 0.95rem;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  color: var(--foreground);
+  transition: background 0.15s;
+}
+
+.linkDropdownItem:hover {
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.carryForward {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  padding: 0.5rem 0;
+  cursor: pointer;
+  transition: color 0.2s;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: none;
+  border: none;
+  font-family: inherit;
+}
+
+.carryForward:hover {
+  color: var(--foreground);
+}
+
+/* Bottom Buttons */
+.bottomButtons {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  gap: 40px;
+  align-items: center;
+}
+
+.gardenButton {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 1.15rem;
+  font-style: italic;
+  color: var(--foreground);
+  cursor: pointer;
+  padding: 0;
+}
+
+.forceMajeureInput {
+  position: fixed;
+  bottom: 50px;
+  right: 20px;
+}
+
+.forceMajeureInput input {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--foreground);
+  font-family: inherit;
+  font-size: 1rem;
+  font-style: italic;
+  color: var(--foreground);
+  padding: 4px 0;
+  outline: none;
+  width: 250px;
+}
+
+.forceMajeureInput input::placeholder {
+  color: var(--foreground);
+  opacity: 0.4;
+}
+
+/* Gardening Session */
+.gardenHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 20px;
+}
+
+.gardenProgress {
+  font-size: 1.15rem;
+  color: var(--foreground);
+}
+
+.gardenCard {
+  padding-top: 20px;
+}
+
+.gardenEventName {
+  font-size: 1.15rem;
+  font-weight: 500;
+  color: var(--foreground);
+  margin-bottom: 4px;
+}
+
+.gardenMeta {
+  font-size: 1.15rem;
+  color: var(--foreground);
+  margin-bottom: 20px;
+}
+
+.gardenField {
+  margin-top: 20px;
+}
+
+.gardenTextarea {
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--foreground);
+  font-family: inherit;
+  font-size: 1.15rem;
+  color: var(--foreground);
+  outline: none;
+  padding: 0.5rem 0;
+  min-height: 80px;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.gardenInput {
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--foreground);
+  font-family: inherit;
+  font-size: 1.15rem;
+  font-style: italic;
+  color: var(--foreground);
+  outline: none;
+  padding: 0.5rem 0;
+}
+
+.gardenInput::placeholder {
+  color: var(--foreground);
+  font-style: italic;
+  opacity: 0.4;
+}
+
+.gardenActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 40px;
+}
+
+.gardenSaveBtn {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 1.15rem;
+  font-weight: 500;
+  color: var(--foreground);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.rheiItem {
+  cursor: pointer;
+  user-select: none;
+}
+
+.rheiItemActive {
+  font-weight: 700;
+}
+
+.rheiAddenda {
+  padding-left: 24px;
+  padding-bottom: 4px;
+  max-width: 50%;
+}
+
+.rheiAddendumRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.rheiAddendumText {
+  flex: 1;
+  font-size: 0.95rem;
+}
+
+.rheiAddendumInput {
+  width: 100%;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--foreground);
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--foreground);
+  padding: 4px 0;
+  margin-top: 2px;
+  outline: none;
+  opacity: 0.6;
+}
+
+.rheiAddendumInput::placeholder {
+  color: var(--foreground);
+  opacity: 0.4;
+}

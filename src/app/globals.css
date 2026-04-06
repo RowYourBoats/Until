@@ -1,0 +1,52 @@
+:root {
+  --background: #ffffff;
+  --foreground: #000000;
+  --text-secondary: #000000;
+  --accent-red: #ed0f0a;
+  --font-family: "PP Neue Montreal", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  /* Tag Colors – Dick Bruna palette */
+  --tag-grants: #319f1a;
+  --tag-exhibitions: #293c64;
+  --tag-competitions: #ed0f0a;
+  --tag-submissions: #d3bd43;
+  --tag-residencies: #d26a37;
+  --tag-images: #7B2D5F;
+  --tag-text: #5D4037;
+}
+
+[data-theme='dark'] {
+  --background: #293c64;
+  --foreground: #ffffff;
+  --text-secondary: #ffffff;
+  --accent-red: #ed0f0a;
+
+  /* Bruna palette – adjusted for contrast on dark blue */
+  --tag-grants: #4dca34;
+  --tag-exhibitions: #8aa8d4;
+  --tag-competitions: #f24a46;
+  --tag-submissions: #eddb1f;
+  --tag-residencies: #e8864a;
+  --tag-images: #d4a0c8;
+  --tag-text: #c4a98f;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-family);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}

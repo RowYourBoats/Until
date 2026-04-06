@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx next:*)",
+      "Bash(du:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(curl:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(npm run:*)",
+      "Bash(rm:*)",
+      "Bash(cd D:/ClaudeCoding/TaskBasedCalendar && rm -rf .next)",
+      "Bash(xargs grep:*)"
+    ]
+  }
+}
