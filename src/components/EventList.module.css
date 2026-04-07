@@ -1077,3 +1077,101 @@
   color: var(--foreground);
   opacity: 0.4;
 }
+
+.rheiScheduleToggle {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--foreground);
+  opacity: 0.5;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.rheiScheduleToggle:hover {
+  opacity: 1;
+}
+
+.rheiScheduleEditor {
+  padding: 4px 0 8px;
+}
+
+.rheiScheduleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.rheiScheduleInput {
+  flex: 1;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--foreground);
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--foreground);
+  padding: 2px 0;
+  outline: none;
+}
+
+.rheiScheduleInput::placeholder {
+  color: var(--foreground);
+  opacity: 0.4;
+}
+
+.dayToggles {
+  display: flex;
+  gap: 2px;
+}
+
+.dayToggle {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--foreground);
+  background: none;
+  font-family: inherit;
+  font-size: 0.65rem;
+  color: var(--foreground);
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.4;
+}
+
+.dayToggleActive {
+  background: var(--foreground);
+  color: var(--background);
+  opacity: 1;
+}
+
+.rheiScheduleSave {
+  background: none;
+  border: 1px solid var(--foreground);
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: var(--foreground);
+  cursor: pointer;
+  padding: 2px 12px;
+  margin-right: 8px;
+}
+
+.rheiEditForm {
+  width: 100%;
+}
+
+.rheiEditActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.rheiScheduledIcon {
+  display: inline;
+  margin-left: 6px;
+  opacity: 0.4;
+  vertical-align: middle;
+}

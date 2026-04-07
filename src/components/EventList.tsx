@@ -53,6 +53,10 @@ interface RheiItem {
     addedAt: string;
     removedAt?: string;
   }>;
+  scheduledTasks?: Array<{
+    text: string;
+    days: number[];  // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+  }>;
 }
 
 interface PomodoroSession {
@@ -139,6 +143,11 @@ export default function EventList() {
   const [newRheiText, setNewRheiText] = useState("");
   const [rheiConfirmDeleteId, setRheiConfirmDeleteId] = useState<string | null>(null);
   const [rheiAddendumText, setRheiAddendumText] = useState<Record<string, string>>({});
+  const [editingRheiId, setEditingRheiId] = useState<string | null>(null);
+  const [rheiFormText, setRheiFormText] = useState("");
+  const [rheiEditSchedule, setRheiEditSchedule] = useState<Array<{ text: string; days: number[] }>>([]);
+  const [rheiCreateSchedule, setRheiCreateSchedule] = useState<Array<{ text: string; days: number[] }>>([]);
+  const [showRheiScheduleEditor, setShowRheiScheduleEditor] = useState(false);
 
   // Gardening session states
   const [gardeningMode, setGardeningMode] = useState(false);
@@ -342,9 +351,33 @@ export default function EventList() {
       text: newRheiText.trim(),
       createdAt: now(),
       engagements: [],
+      ...(rheiCreateSchedule.length > 0 && { scheduledTasks: rheiCreateSchedule.filter(s => s.text.trim() && s.days.length > 0) }),
     };
     saveRheiItems([...rheiItems, newItem]);
     setNewRheiText("");
+    setRheiCreateSchedule([]);
+    setShowRheiScheduleEditor(false);
+  };
+
+  const handleSaveRheiEdit = () => {
+    if (!editingRheiId || !rheiFormText.trim()) return;
+    const cleanSchedule = rheiEditSchedule.filter(s => s.text.trim() && s.days.length > 0);
+    const updated = rheiItems.map(r =>
+      r.id === editingRheiId
+        ? { ...r, text: rheiFormText.trim(), scheduledTasks: cleanSchedule.length > 0 ? cleanSchedule : undefined }
+        : r
+    );
+    saveRheiItems(updated);
+    setEditingRheiId(null);
+    setRheiFormText("");
+    setRheiEditSchedule([]);
+  };
+
+  const startEditingRhei = (item: RheiItem) => {
+    setEditingRheiId(item.id);
+    setRheiFormText(item.text);
+    setRheiEditSchedule(item.scheduledTasks || []);
+    setShowRheiScheduleEditor(false);
   };
 
   const handleDeleteRheiItem = (itemId: string) => {
@@ -389,8 +422,9 @@ export default function EventList() {
       saveRheiItems(updatedRhei);
       // Only create daily task if one doesn't already exist
       const alreadyExists = dailyTasks.some(t => t.rheiItemId === itemId && t.date === todayStr);
+      const newTasks: DailyTask[] = [];
       if (!alreadyExists) {
-        const newTask: DailyTask = {
+        newTasks.push({
           id: Math.random().toString(36).substr(2, 9),
           text: item.text,
           completed: false,
@@ -399,8 +433,31 @@ export default function EventList() {
           createdAt: ts,
           completedAt: null,
           changes: [ts],
-        };
-        saveDailyTasks([...dailyTasks, newTask]);
+        });
+      }
+      // Auto-create scheduled tasks for today
+      if (item.scheduledTasks) {
+        const todayDay = new Date().getDay();
+        item.scheduledTasks
+          .filter(st => st.days.includes(todayDay))
+          .forEach(st => {
+            const fullText = `${item.text} - ${st.text}`;
+            if (!dailyTasks.some(t => t.rheiItemId === itemId && t.date === todayStr && t.text === fullText)) {
+              newTasks.push({
+                id: Math.random().toString(36).substr(2, 9),
+                text: fullText,
+                completed: false,
+                date: todayStr,
+                rheiItemId: itemId,
+                createdAt: ts,
+                completedAt: null,
+                changes: [ts],
+              });
+            }
+          });
+      }
+      if (newTasks.length > 0) {
+        saveDailyTasks([...dailyTasks, ...newTasks]);
       }
     }
   };
@@ -1339,8 +1396,61 @@ export default function EventList() {
               placeholder="Add a recurring task..."
               value={newRheiText}
               onChange={e => setNewRheiText(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleAddRheiItem(); }}
+              onKeyDown={e => { if (e.key === 'Enter' && !showRheiScheduleEditor) handleAddRheiItem(); }}
             />
+            {newRheiText.trim() && (
+              <button className={styles.rheiScheduleToggle} onClick={() => {
+                const next = !showRheiScheduleEditor;
+                setShowRheiScheduleEditor(next);
+                if (next && rheiCreateSchedule.length === 0) setRheiCreateSchedule([{ text: '', days: [] }]);
+              }}>
+                {showRheiScheduleEditor ? 'hide schedule' : '+ add schedule'}
+              </button>
+            )}
+            {showRheiScheduleEditor && (
+              <div className={styles.rheiScheduleEditor}>
+                {rheiCreateSchedule.map((st, idx) => (
+                  <div key={idx} className={styles.rheiScheduleRow}>
+                    <input
+                      type="text"
+                      className={styles.rheiScheduleInput}
+                      placeholder="Task name..."
+                      value={st.text}
+                      onChange={e => {
+                        const updated = [...rheiCreateSchedule];
+                        updated[idx] = { ...st, text: e.target.value };
+                        setRheiCreateSchedule(updated);
+                      }}
+                    />
+                    <div className={styles.dayToggles}>
+                      {['S','M','T','W','T','F','S'].map((label, dayIdx) => (
+                        <button
+                          key={dayIdx}
+                          className={`${styles.dayToggle} ${st.days.includes(dayIdx) ? styles.dayToggleActive : ''}`}
+                          onClick={() => {
+                            const updated = [...rheiCreateSchedule];
+                            const days = st.days.includes(dayIdx) ? st.days.filter(d => d !== dayIdx) : [...st.days, dayIdx];
+                            updated[idx] = { ...st, days };
+                            setRheiCreateSchedule(updated);
+                          }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <button className={styles.taskActionBtn} onClick={() => setRheiCreateSchedule(rheiCreateSchedule.filter((_, i) => i !== idx))}>
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+                <button className={styles.rheiScheduleToggle} onClick={() => setRheiCreateSchedule([...rheiCreateSchedule, { text: '', days: [] }])}>
+                  + add task
+                </button>
+                <button className={styles.rheiScheduleSave} onClick={handleAddRheiItem}>
+                  Create
+                </button>
+              </div>
+            )}
             <AnimatePresence mode="popLayout">
               {rheiItems.map(item => (
                 <motion.div
@@ -1352,31 +1462,92 @@ export default function EventList() {
                   layout="position"
                   transition={{ layout: { duration: 0.2 }, opacity: { duration: 0.15 } }}
                 >
-                  <div
-                    className={`${styles.taskContent} ${styles.rheiItem}`}
-                    onClick={() => handleToggleRheiEngagement(item.id)}
-                  >
-                    <div className={`${styles.taskText} ${isRheiEngagedToday(item.id) ? styles.rheiItemActive : ''}`}>
-                      {item.text}
+                  {editingRheiId === item.id ? (
+                    <div className={styles.rheiEditForm}>
+                      <input
+                        type="text"
+                        className={styles.dailyTaskInput}
+                        value={rheiFormText}
+                        onChange={e => setRheiFormText(e.target.value)}
+                        autoFocus
+                      />
+                      {rheiEditSchedule.map((st, idx) => (
+                        <div key={idx} className={styles.rheiScheduleRow}>
+                          <input
+                            type="text"
+                            className={styles.rheiScheduleInput}
+                            placeholder="Task name..."
+                            value={st.text}
+                            onChange={e => {
+                              const updated = [...rheiEditSchedule];
+                              updated[idx] = { ...st, text: e.target.value };
+                              setRheiEditSchedule(updated);
+                            }}
+                          />
+                          <div className={styles.dayToggles}>
+                            {['S','M','T','W','T','F','S'].map((label, dayIdx) => (
+                              <button
+                                key={dayIdx}
+                                className={`${styles.dayToggle} ${st.days.includes(dayIdx) ? styles.dayToggleActive : ''}`}
+                                onClick={() => {
+                                  const updated = [...rheiEditSchedule];
+                                  const days = st.days.includes(dayIdx) ? st.days.filter(d => d !== dayIdx) : [...st.days, dayIdx];
+                                  updated[idx] = { ...st, days };
+                                  setRheiEditSchedule(updated);
+                                }}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                          <button className={styles.taskActionBtn} onClick={() => setRheiEditSchedule(rheiEditSchedule.filter((_, i) => i !== idx))}>
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                      <div className={styles.rheiEditActions}>
+                        <button className={styles.rheiScheduleToggle} onClick={() => setRheiEditSchedule([...rheiEditSchedule, { text: '', days: [] }])}>
+                          + add task
+                        </button>
+                        <div>
+                          <button className={styles.rheiScheduleSave} onClick={handleSaveRheiEdit}>Save</button>
+                          <button className={styles.rheiScheduleToggle} onClick={() => { setEditingRheiId(null); setRheiFormText(""); setRheiEditSchedule([]); }}>Cancel</button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div className={styles.taskActions}>
-                    {rheiConfirmDeleteId === item.id ? (
-                      <>
-                        <button className={styles.taskActionBtn} onClick={() => { handleDeleteRheiItem(item.id); setRheiConfirmDeleteId(null); }}>
-                          <X size={14} />
+                  ) : (
+                    <>
+                      <div
+                        className={`${styles.taskContent} ${styles.rheiItem}`}
+                        onClick={() => handleToggleRheiEngagement(item.id)}
+                      >
+                        <div className={`${styles.taskText} ${isRheiEngagedToday(item.id) ? styles.rheiItemActive : ''}`}>
+                          {item.text}
+                          {item.scheduledTasks && item.scheduledTasks.length > 0 && <Calendar size={12} className={styles.rheiScheduledIcon} />}
+                        </div>
+                      </div>
+                      <div className={styles.taskActions}>
+                        <button className={styles.taskActionBtn} onClick={() => startEditingRhei(item)}>
+                          <Edit2 size={14} />
                         </button>
-                        <button className={styles.taskActionBtn} onClick={() => setRheiConfirmDeleteId(null)}>
-                          undo
-                        </button>
-                      </>
-                    ) : (
-                      <button className={styles.taskActionBtn} onClick={() => setRheiConfirmDeleteId(item.id)}>
-                        <X size={14} />
-                      </button>
-                    )}
-                  </div>
-                  {isRheiEngagedToday(item.id) && (
+                        {rheiConfirmDeleteId === item.id ? (
+                          <>
+                            <button className={styles.taskActionBtn} onClick={() => { handleDeleteRheiItem(item.id); setRheiConfirmDeleteId(null); }}>
+                              <X size={14} />
+                            </button>
+                            <button className={styles.taskActionBtn} onClick={() => setRheiConfirmDeleteId(null)}>
+                              undo
+                            </button>
+                          </>
+                        ) : (
+                          <button className={styles.taskActionBtn} onClick={() => setRheiConfirmDeleteId(item.id)}>
+                            <X size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  {isRheiEngagedToday(item.id) && editingRheiId !== item.id && (
                     <div className={styles.rheiAddenda}>
                       {dailyTasks
                         .filter(t => t.rheiItemId === item.id && t.date === todayStr && t.text !== item.text)
@@ -1547,7 +1718,7 @@ export default function EventList() {
               autoFocus
             />
             <datalist id="fm-reasons">
-              {[...new Set(pomodoroSessions.filter(s => s.forceMajeureReason).map(s => s.forceMajeureReason))].map(r => (
+              {Array.from(new Set(pomodoroSessions.filter(s => s.forceMajeureReason).map(s => s.forceMajeureReason!))).map(r => (
                 <option key={r} value={r} />
               ))}
             </datalist>
