@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef, useLayoutEffect } from "react";
+
+const fitTextarea = (el: HTMLTextAreaElement | null) => {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+};
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Minus, X, Globe, Calendar, Edit2, ExternalLink, Link2 } from "lucide-react";
 import styles from "./EventList.module.css";
@@ -29,6 +35,7 @@ interface EventItem {
   createdAt?: string;
   completedAt?: string | null;
   gardenedAt?: string | null;
+  starred?: boolean;
 }
 
 interface DailyTask {
@@ -156,6 +163,12 @@ export default function EventList() {
   const [gardenNextAction, setGardenNextAction] = useState("");
   const [gardenTodos, setGardenTodos] = useState<TodoItem[]>([]);
   const [gardenNewTodo, setGardenNewTodo] = useState("");
+  const gardenDescRef = useRef<HTMLTextAreaElement>(null);
+  const formDescRef = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    fitTextarea(gardenDescRef.current);
+  }, [gardenDesc, gardeningMode, gardenIndex]);
 
   // Pomodoro states
   const POMODORO_DURATION = 35 * 60; // 35 minutes in seconds
@@ -202,6 +215,10 @@ export default function EventList() {
   });
 
   const [newTodoText, setNewTodoText] = useState("");
+
+  useLayoutEffect(() => {
+    fitTextarea(formDescRef.current);
+  }, [formData.description, isAdding, editingId]);
 
   useEffect(() => {
     setMounted(true);
@@ -548,23 +565,21 @@ export default function EventList() {
     setLinkingTaskId(null);
   };
 
-  const yesterdayStr = useMemo(() => getDateStr(-1), []);
-
-  const uncheckedYesterday = useMemo(() => {
-    return dailyTasks.filter(t => t.date === yesterdayStr && !t.completed && !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text)));
-  }, [dailyTasks, yesterdayStr, rheiItems]);
+  const uncheckedPrior = useMemo(() => {
+    return dailyTasks.filter(t => t.date < todayStr && !t.completed && !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text)));
+  }, [dailyTasks, todayStr, rheiItems]);
 
   const handleCarryForward = () => {
     const ts = now();
-    const yesterdayIds = new Set(uncheckedYesterday.map(t => t.id));
-    const copies = uncheckedYesterday.map(t => ({
+    const priorIds = new Set(uncheckedPrior.map(t => t.id));
+    const copies = uncheckedPrior.map(t => ({
       ...t,
       id: Math.random().toString(36).substr(2, 9),
       date: selectedDate,
       carriedFrom: t.carriedFrom || t.date,
       changes: [...(t.changes || []), ts],
     }));
-    const remaining = dailyTasks.filter(t => !yesterdayIds.has(t.id));
+    const remaining = dailyTasks.filter(t => !priorIds.has(t.id));
     saveDailyTasks([...remaining, ...copies]);
   };
 
@@ -645,6 +660,11 @@ export default function EventList() {
       });
       setEvents(updatedEvents);
     }
+  };
+
+  const handleStarToggle = async (eventId: string) => {
+    const updatedEvents = events.map(ev => ev.id === eventId ? { ...ev, starred: !ev.starred } : ev);
+    await saveEvents(updatedEvents);
   };
 
   const handleStatusChange = async (eventId: string, status: 'active' | 'completed' | 'incomplete') => {
@@ -1045,10 +1065,12 @@ export default function EventList() {
 
           <div className={styles.gardenField}>
             <textarea
+              ref={gardenDescRef}
               className={styles.gardenTextarea}
               placeholder="Description..."
               value={gardenDesc}
               onChange={e => setGardenDesc(e.target.value)}
+              onInput={e => fitTextarea(e.currentTarget)}
             />
           </div>
 
@@ -1118,12 +1140,6 @@ export default function EventList() {
           <button className={styles.textBtn} onClick={() => setShowFilters(!showFilters)}>
             Filter
           </button>
-          <button className={styles.addButton} onClick={() => { minimizedLockedRef.current = !minimizedLockedRef.current; setMinimized(minimizedLockedRef.current); }}>
-            {minimized ? <span className={styles.minimizeIcon}>|</span> : <Minus size={20} />}
-          </button>
-          <button className={styles.addButton} onClick={() => { setIsAdding(!isAdding); setEditingId(null); }}>
-            {isAdding ? <X size={20} /> : <Plus size={20} />}
-          </button>
         </div>
       </div>
 
@@ -1164,7 +1180,7 @@ export default function EventList() {
             <input type="date" value={formData.dueDate} onChange={(e) => setFormData({...formData, dueDate: e.target.value})} className={styles.input} required />
             <input type="url" placeholder="Website (optional)" value={formData.url} onChange={(e) => setFormData({...formData, url: e.target.value})} className={styles.input} />
             <input type="text" placeholder="Next action… e.g. Send PDF to PurePrint" value={formData.nextAction} onChange={(e) => setFormData({...formData, nextAction: e.target.value})} className={styles.input} />
-            <textarea placeholder="Description" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className={styles.textarea} />
+            <textarea ref={formDescRef} placeholder="Description" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} onInput={(e) => fitTextarea(e.currentTarget)} className={styles.textarea} />
 
             <div className={styles.todoSection}>
               <div className={styles.todoHeader}>To-do List</div>
@@ -1209,19 +1225,6 @@ export default function EventList() {
 
       {/* Pomodoro Section */}
       <div className={styles.pomodoroSection}>
-        <div className={styles.pomodoroHeader}>
-          <span className={styles.pomodoroTitle}>Pomodoro</span>
-          <span className={styles.pomodoroTime}>
-            {String(pomodoroMinutes).padStart(2, '0')}:{String(pomodoroSecs).padStart(2, '0')}
-            <span className={styles.pomodoroDuration}> / 35:00</span>
-            {pomodoroComplete && pomodoroCompletedAt && (
-              <span className={styles.pomodoroCompletedAt}>
-                {' '}Completed at {new Date(pomodoroCompletedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-              </span>
-            )}
-          </span>
-        </div>
-
         <div className={styles.pomodoroTimeline}>
           <div className={`${styles.pomodoroTrack} ${pomodoroActive ? styles.pomodoroTrackActive : ''}`}>
             <div
@@ -1243,6 +1246,53 @@ export default function EventList() {
           </div>
         </div>
 
+        <div className={styles.pomodoroHeader}>
+          <span className={styles.pomodoroTitle}>
+            Pomodoro
+            <span className={styles.pomodoroDuration}>
+              {' '}{String(pomodoroMinutes).padStart(2, '0')}:{String(pomodoroSecs).padStart(2, '0')} / 35:00
+            </span>
+            {pomodoroComplete && pomodoroCompletedAt && (
+              <span className={styles.pomodoroCompletedAt}>
+                {' '}Completed at {new Date(pomodoroCompletedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+              </span>
+            )}
+          </span>
+          <div className={styles.pomodoroControls}>
+            {!pomodoroActive && !pomodoroComplete && (
+              <button className={styles.textBtn} onClick={startPomodoro}>
+                {pomodoroSeconds > 0 ? 'Resume' : 'Start'}
+              </button>
+            )}
+            {pomodoroComplete && (
+              <button className={styles.textBtn} onClick={completePomodoro}>
+                Reset
+              </button>
+            )}
+            {(pomodoroSeconds > 0 && !pomodoroComplete) && (
+              <button className={styles.textBtn} onClick={completePomodoro}>
+                Completed
+              </button>
+            )}
+            {(pomodoroActive || (pomodoroSeconds > 0 && !pomodoroComplete)) && (
+              <button className={styles.textBtn} onClick={postponePomodoro}>
+                Postponed
+              </button>
+            )}
+            {(pomodoroActive || (pomodoroSeconds > 0 && !pomodoroComplete)) && (
+              <button className={styles.textBtn} onClick={freshPomodoro}>
+                Fresh
+              </button>
+            )}
+            <button
+              className={`${styles.textBtn} ${pomodoroSelectingTask ? styles.pomodoroSelectActive : ''}`}
+              onClick={newPomodoro}
+            >
+              New
+            </button>
+          </div>
+        </div>
+
         {(pomodoroTask || pomodoroEvent) && (
           <div className={styles.pomodoroTaskLabel}>
             {pomodoroEvent && <span className={styles.pomodoroEventName}>{pomodoroEvent.name}</span>}
@@ -1250,40 +1300,6 @@ export default function EventList() {
             {pomodoroTask && <span>{pomodoroTask.text}</span>}
           </div>
         )}
-
-        <div className={styles.pomodoroControls}>
-          {!pomodoroActive && !pomodoroComplete && (
-            <button className={styles.textBtn} onClick={startPomodoro}>
-              {pomodoroSeconds > 0 ? 'Resume' : 'Start'}
-            </button>
-          )}
-          {pomodoroComplete && (
-            <button className={styles.textBtn} onClick={completePomodoro}>
-              Reset
-            </button>
-          )}
-          {(pomodoroSeconds > 0 && !pomodoroComplete) && (
-            <button className={styles.textBtn} onClick={completePomodoro}>
-              Completed
-            </button>
-          )}
-          {(pomodoroActive || (pomodoroSeconds > 0 && !pomodoroComplete)) && (
-            <button className={styles.textBtn} onClick={postponePomodoro}>
-              Postponed
-            </button>
-          )}
-          {(pomodoroActive || (pomodoroSeconds > 0 && !pomodoroComplete)) && (
-            <button className={styles.textBtn} onClick={freshPomodoro}>
-              Fresh
-            </button>
-          )}
-          <button
-            className={`${styles.textBtn} ${pomodoroSelectingTask ? styles.pomodoroSelectActive : ''}`}
-            onClick={newPomodoro}
-          >
-            New
-          </button>
-        </div>
 
         <AnimatePresence>
           {pomodoroSelectingTask && (
@@ -1384,7 +1400,7 @@ export default function EventList() {
             className={`${styles.dateNavBtn} ${dailyDateTab === 'rhei' ? styles.dateNavActive : ''}`}
             onClick={() => setDailyDateTab('rhei')}
           >
-            rhei
+            Now
           </button>
         </div>
 
@@ -1510,8 +1526,16 @@ export default function EventList() {
                           + add task
                         </button>
                         <div>
+                          {rheiConfirmDeleteId === item.id ? (
+                            <>
+                              <button className={styles.rheiScheduleToggle} onClick={() => { handleDeleteRheiItem(item.id); setRheiConfirmDeleteId(null); setEditingRheiId(null); setRheiFormText(""); setRheiEditSchedule([]); }}>Confirm delete</button>
+                              <button className={styles.rheiScheduleToggle} onClick={() => setRheiConfirmDeleteId(null)}>Undo</button>
+                            </>
+                          ) : (
+                            <button className={styles.rheiScheduleToggle} onClick={() => setRheiConfirmDeleteId(item.id)}>Delete</button>
+                          )}
                           <button className={styles.rheiScheduleSave} onClick={handleSaveRheiEdit}>Save</button>
-                          <button className={styles.rheiScheduleToggle} onClick={() => { setEditingRheiId(null); setRheiFormText(""); setRheiEditSchedule([]); }}>Cancel</button>
+                          <button className={styles.rheiScheduleToggle} onClick={() => { setEditingRheiId(null); setRheiFormText(""); setRheiEditSchedule([]); setRheiConfirmDeleteId(null); }}>Cancel</button>
                         </div>
                       </div>
                     </div>
@@ -1530,20 +1554,6 @@ export default function EventList() {
                         <button className={styles.taskActionBtn} onClick={() => startEditingRhei(item)}>
                           <Edit2 size={14} />
                         </button>
-                        {rheiConfirmDeleteId === item.id ? (
-                          <>
-                            <button className={styles.taskActionBtn} onClick={() => { handleDeleteRheiItem(item.id); setRheiConfirmDeleteId(null); }}>
-                              <X size={14} />
-                            </button>
-                            <button className={styles.taskActionBtn} onClick={() => setRheiConfirmDeleteId(null)}>
-                              undo
-                            </button>
-                          </>
-                        ) : (
-                          <button className={styles.taskActionBtn} onClick={() => setRheiConfirmDeleteId(item.id)}>
-                            <X size={14} />
-                          </button>
-                        )}
                       </div>
                     </>
                   )}
@@ -1559,7 +1569,11 @@ export default function EventList() {
                               onChange={() => handleToggleDailyTask(task.id)}
                               className={styles.taskCheckbox}
                             />
-                            <span className={`${styles.rheiAddendumText} ${task.completed ? styles.taskTextCompleted : ''}`}>
+                            <span
+                              className={`${styles.rheiAddendumText} ${task.completed ? styles.taskTextCompleted : ''}`}
+                              onClick={() => handleToggleDailyTask(task.id)}
+                              style={{ cursor: 'pointer' }}
+                            >
                               {task.text.replace(`${item.text} - `, '')}
                             </span>
                             <button className={styles.taskActionBtn} onClick={() => handleDeleteDailyTask(task.id)}>
@@ -1593,8 +1607,12 @@ export default function EventList() {
           onKeyDown={e => { if (e.key === 'Enter') handleAddDailyTask(); }}
         />
 
-        <AnimatePresence mode="popLayout">
-          {tasksForSelectedDate.filter(t => (!hideCompletedTasks || !t.completed) && !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text))).map(task => (
+        {(() => {
+          const visibleTasks = tasksForSelectedDate.filter(t => !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text)));
+          const incompleteTasks = visibleTasks.filter(t => !t.completed);
+          const allCompleted = visibleTasks.filter(t => t.completed);
+          const completedTasks = hideCompletedTasks ? [] : allCompleted;
+          const renderTask = (task: DailyTask) => (
             <motion.div
               key={task.id}
               className={styles.taskRow}
@@ -1610,7 +1628,7 @@ export default function EventList() {
                 onChange={() => handleToggleDailyTask(task.id)}
                 className={styles.taskCheckbox}
               />
-              <div className={styles.taskContent}>
+              <div className={styles.taskContent} onClick={() => handleToggleDailyTask(task.id)}>
                 <div className={`${styles.taskText} ${task.completed ? styles.taskTextCompleted : ""}`}>
                   {task.text}
                 </div>
@@ -1648,21 +1666,31 @@ export default function EventList() {
                 </button>
               </div>
             </motion.div>
-          ))}
-        </AnimatePresence>
+          );
+          return (
+            <>
+              <AnimatePresence mode="popLayout">
+                {incompleteTasks.map(renderTask)}
+              </AnimatePresence>
+              {allCompleted.length > 0 && (
+                <div
+                  className={styles.completedHeader}
+                  onClick={() => setHideCompletedTasks(!hideCompletedTasks)}
+                >
+                  <span>Completed</span>
+                  <span className={styles.completedToggle}>{hideCompletedTasks ? '|' : '–'}</span>
+                </div>
+              )}
+              <AnimatePresence mode="popLayout">
+                {completedTasks.map(renderTask)}
+              </AnimatePresence>
+            </>
+          );
+        })()}
 
-        {dailyDateTab === 'today' && uncheckedYesterday.length > 0 && (
+        {dailyDateTab === 'today' && uncheckedPrior.length > 0 && (
           <button className={styles.carryForward} onClick={handleCarryForward}>
-            Carry forward {uncheckedYesterday.length} unchecked task{uncheckedYesterday.length !== 1 ? 's' : ''} from yesterday
-          </button>
-        )}
-
-        {tasksForSelectedDate.some(t => t.completed && !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text))) && (
-          <button
-            className={styles.clearCompletedBtn}
-            onClick={() => setHideCompletedTasks(!hideCompletedTasks)}
-          >
-            {hideCompletedTasks ? 'Show completed' : 'Clear completed'}
+            Carry forward {uncheckedPrior.length} unchecked task{uncheckedPrior.length !== 1 ? 's' : ''}
           </button>
         )}
         </>
@@ -1682,19 +1710,31 @@ export default function EventList() {
         >
           Archive
         </button>
+        <button
+          className={`${styles.tabBtn} ${styles.tabActive}`}
+          onClick={() => { minimizedLockedRef.current = !minimizedLockedRef.current; setMinimized(minimizedLockedRef.current); }}
+        >
+          {minimized ? '|' : '–'}
+        </button>
+        <button
+          className={`${styles.tabBtn} ${styles.tabActive}`}
+          onClick={() => { setIsAdding(!isAdding); setEditingId(null); }}
+        >
+          {isAdding ? '×' : '+'}
+        </button>
       </div>
 
       <div className={styles.list}>
         {currentTab === 'ongoing' && (
           <>
-            {renderSection("Over The Horizon", groupedEvents.overTheHorizon, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, showNextActions)}
-            {renderSection("Short Horizon", groupedEvents.thisWeek, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, showNextActions)}
-            {!minimized && renderSection("Horizon", groupedEvents.later, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, showNextActions)}
-            {!minimized && renderSection("Long Horizon", groupedEvents.longHorizon, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, showNextActions)}
+            {renderSection("Over The Horizon", groupedEvents.overTheHorizon, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions)}
+            {renderSection("Short Horizon", groupedEvents.thisWeek, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions)}
+            {!minimized && renderSection("Horizon", groupedEvents.later, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions)}
+            {!minimized && renderSection("Long Horizon", groupedEvents.longHorizon, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions)}
           </>
         )}
         {currentTab === 'archive' && (
-          renderSection("Archived", groupedEvents.archived, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, showNextActions)
+          renderSection("Over The Horizon", groupedEvents.archived, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions)
         )}
         {activeFilters.length > 0 && filteredEvents.length === 0 && <div className={styles.empty}>No matching horizons</div>}
       </div>
@@ -1744,18 +1784,20 @@ function renderSection(
   onStatusChange: (eventId: string, status: 'active' | 'completed' | 'incomplete') => void,
   onNextActionChange: (eventId: string, nextAction: string) => void,
   onDelete: (eventId: string) => void,
+  onStarToggle: (eventId: string) => void,
   showNextActions: boolean = false
 ) {
   if (items.length === 0) return null;
   return (
     <div className={styles.section}>
-      <h3 className={styles.sectionTitle}>{title}</h3>
+      <h3 className={`${styles.sectionTitle} ${title === "Over The Horizon" ? styles.sectionTitleBlue : ""}`}>{title}</h3>
       {items.map((event) => {
         const { daysText, weekday } = getDaysData(event.dueDate);
         const isArchived = (event.status || 'active') !== 'active';
         const isExpanded = expandedIds.includes(event.id);
         return (
           <div key={event.id} className={styles.itemWrapper}>
+            {event.starred && <span className={styles.starMark} aria-label="starred">★</span>}
             <div className={styles.item} onClick={() => onToggle(event.id)}>
               <div className={styles.itemMain}>
                 <div className={styles.eventNameGroup}>
@@ -1818,6 +1860,7 @@ function renderSection(
 
                     <div className={styles.archiveActions}>
                       <button className={styles.editBtn} onClick={(e) => onEdit(e, event)}><Edit2 size={16} /> Edit</button>
+                      <button className={styles.editBtn} onClick={() => onStarToggle(event.id)}>{event.starred ? '★ Unstar' : '☆ Star'}</button>
                       {!isArchived ? (
                         <>
                           <button onClick={() => onStatusChange(event.id, 'completed')} className={styles.completeBtn}>Mark Complete</button>

@@ -11,7 +11,8 @@
       "Bash(npm run:*)",
       "Bash(rm:*)",
       "Bash(cd D:/ClaudeCoding/TaskBasedCalendar && rm -rf .next)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }
