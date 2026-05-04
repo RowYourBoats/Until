@@ -16,7 +16,11 @@ TODAY.setHours(0, 0, 0, 0);
 
 const isPersonal = !process.env.NEXT_PUBLIC_VERCEL_ENV;
 
-type TagType = "grants" | "exhibitions" | "competitions" | "submissions" | "residencies" | "images" | "text";
+type TagType =
+  | "grants" | "residencies" | "fellowship" | "competitions" | "exhibitions" | "conference"
+  | "funded"
+  | "text" | "images" | "video" | "code" | "portfolio" | "cv" | "proposal"
+  | "admin";
 
 interface TodoItem {
   id: string;
@@ -84,7 +88,12 @@ interface PomodoroSession {
   forceMajeureReason?: string;
 }
 
-const AVAILABLE_TAGS: TagType[] = ["grants", "exhibitions", "competitions", "submissions", "residencies", "images", "text"];
+const AVAILABLE_TAGS: TagType[] = [
+  "grants", "residencies", "fellowship", "competitions", "exhibitions", "conference",
+  "funded",
+  "text", "images", "video", "code", "portfolio", "cv", "proposal",
+  "admin",
+];
 
 const now = () => new Date().toISOString();
 

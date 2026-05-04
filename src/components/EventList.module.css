@@ -354,12 +354,20 @@
 }
 
 .tag-grants { color: var(--tag-grants); }
-.tag-exhibitions { color: var(--tag-exhibitions); }
-.tag-competitions { color: var(--tag-competitions); }
-.tag-submissions { color: var(--tag-submissions); }
 .tag-residencies { color: var(--tag-residencies); }
-.tag-images { color: var(--tag-images); }
+.tag-fellowship { color: var(--tag-fellowship); }
+.tag-competitions { color: var(--tag-competitions); }
+.tag-exhibitions { color: var(--tag-exhibitions); }
+.tag-conference { color: var(--tag-conference); }
+.tag-funded { color: var(--tag-funded); }
 .tag-text { color: var(--tag-text); }
+.tag-images { color: var(--tag-images); }
+.tag-video { color: var(--tag-video); }
+.tag-code { color: var(--tag-code); }
+.tag-portfolio { color: var(--tag-portfolio); }
+.tag-cv { color: var(--tag-cv); }
+.tag-proposal { color: var(--tag-proposal); }
+.tag-admin { color: var(--tag-admin); }
 
 .archiveActions {
   display: flex;

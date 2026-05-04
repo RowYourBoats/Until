@@ -7,12 +7,20 @@
 
   /* Tag Colors – Dick Bruna palette */
   --tag-grants: #319f1a;
-  --tag-exhibitions: #293c64;
-  --tag-competitions: #ed0f0a;
-  --tag-submissions: #d3bd43;
   --tag-residencies: #d26a37;
-  --tag-images: #7B2D5F;
+  --tag-fellowship: #c2185b;
+  --tag-competitions: #ed0f0a;
+  --tag-exhibitions: #293c64;
+  --tag-conference: #455a64;
+  --tag-funded: #d3bd43;
   --tag-text: #5D4037;
+  --tag-images: #7B2D5F;
+  --tag-video: #ff7043;
+  --tag-code: #2e7d32;
+  --tag-portfolio: #008080;
+  --tag-cv: #4a90d9;
+  --tag-proposal: #8B4513;
+  --tag-admin: #6b6b6b;
 }
 
 [data-theme='dark'] {
@@ -23,12 +31,20 @@
 
   /* Bruna palette – adjusted for contrast on dark blue */
   --tag-grants: #4dca34;
-  --tag-exhibitions: #8aa8d4;
-  --tag-competitions: #f24a46;
-  --tag-submissions: #eddb1f;
   --tag-residencies: #e8864a;
-  --tag-images: #d4a0c8;
+  --tag-fellowship: #ec407a;
+  --tag-competitions: #f24a46;
+  --tag-exhibitions: #8aa8d4;
+  --tag-conference: #90a4ae;
+  --tag-funded: #eddb1f;
   --tag-text: #c4a98f;
+  --tag-images: #d4a0c8;
+  --tag-video: #ffab91;
+  --tag-code: #66bb6a;
+  --tag-portfolio: #4dd0e1;
+  --tag-cv: #82b1ff;
+  --tag-proposal: #bcaaa4;
+  --tag-admin: #b0bec5;
 }
 
 * {
