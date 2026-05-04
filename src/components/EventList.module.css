@@ -958,6 +958,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  position: relative;
 }
 
 .gardenButton {
@@ -971,9 +972,9 @@
 }
 
 .forceMajeureInput {
-  position: fixed;
-  bottom: 50px;
-  right: 20px;
+  position: absolute;
+  bottom: 100%;
+  right: 0;
 }
 
 .forceMajeureInput input {
@@ -982,7 +983,6 @@
   border-bottom: 1px solid var(--foreground);
   font-family: inherit;
   font-size: 1rem;
-  font-style: italic;
   color: var(--foreground);
   padding: 4px 0;
   outline: none;

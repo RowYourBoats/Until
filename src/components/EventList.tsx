@@ -207,6 +207,10 @@ export default function EventList() {
   // Backfill nowId on existing pomodoro sessions once per load
   const nowIdBackfillRan = React.useRef(false);
 
+  // Session-only fallback for the Worked Out button when there's no Exercise rhei item (Vercel/empty data).
+  // Holds the date string the user last tapped Worked Out; resets on reload.
+  const [workedOutFallback, setWorkedOutFallback] = useState<string | null>(null);
+
   // Rhei tap debounce: optimistic state per item + pending timers
   const [pendingRheiState, setPendingRheiState] = useState<Record<string, boolean>>({});
   const pendingRheiTimers = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -1816,11 +1820,18 @@ export default function EventList() {
       <div className={styles.bottomButtons}>
         {(() => {
           const exercise = rheiItems.find(r => r.text === 'Exercise');
+          const isMarked = exercise
+            ? isRheiEngagedTodayEffective(exercise.id)
+            : workedOutFallback === todayStr;
+          const handleClick = () => {
+            if (exercise) handleToggleRheiEngagement(exercise.id);
+            else setWorkedOutFallback(prev => prev === todayStr ? null : todayStr);
+          };
           return (
             <button
               className={styles.gardenButton}
-              onClick={() => exercise && handleToggleRheiEngagement(exercise.id)}
-              style={exercise && isRheiEngagedTodayEffective(exercise.id) ? { textDecoration: 'line-through' } : undefined}
+              onClick={handleClick}
+              style={isMarked ? { textDecoration: 'line-through' } : undefined}
             >
               Worked Out
             </button>
