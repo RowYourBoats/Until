@@ -1635,7 +1635,7 @@ export default function EventList() {
                       </div>
                     </>
                   )}
-                  {isRheiEngagedToday(item.id) && editingRheiId !== item.id && (
+                  {isRheiEngagedTodayEffective(item.id) && editingRheiId !== item.id && (
                     <div className={styles.rheiAddenda}>
                       {dailyTasks
                         .filter(t => t.rheiItemId === item.id && t.date === todayStr && t.text !== item.text)
