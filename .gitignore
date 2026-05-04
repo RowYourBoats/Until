@@ -14,7 +14,19 @@ projects/trash/*
 !**/.gitkeep
 
 # TypeScript build info
-tsconfig.tsbuildinfo
+*.tsbuildinfo
 
 # Environment
 .env*
+
+# OS / editor
+.DS_Store
+*.log
+.vscode/
+.idea/
+
+# Claude Code per-user state
+.claude/settings.local.json
+.claude/projects/
+.claude/todos/
+.claude/history/
