@@ -22,6 +22,8 @@ interface TodoItem {
   id: string;
   text: string;
   completed: boolean;
+  createdAt?: string;
+  completedAt?: string | null;
 }
 
 interface EventItem {
@@ -74,16 +76,12 @@ interface PomodoroSession {
   taskText: string | null;
   eventId: string | null;
   eventName: string | null;
+  nowId: string | null;
   startedAt: string;
   completedAt: string;
   durationSeconds: number;
-  outcome?: 'completed' | 'fresh' | 'forceMajeure' | 'postponed';
+  outcome?: 'completed' | 'fresh' | 'forceMajeure' | 'postponed' | 'aborted';
   forceMajeureReason?: string;
-}
-
-interface WorkoutEntry {
-  id: string;
-  timestamp: string;
 }
 
 const AVAILABLE_TAGS: TagType[] = ["grants", "exhibitions", "competitions", "submissions", "residencies", "images", "text"];
@@ -187,8 +185,13 @@ export default function EventList() {
   const [forceMajeurePrompt, setForceMajeurePrompt] = useState(false);
   const [forceMajeureReason, setForceMajeureReason] = useState("");
 
-  // Workout log
-  const [workoutEntries, setWorkoutEntries] = useState<WorkoutEntry[]>([]);
+  // Backfill nowId on existing pomodoro sessions once per load
+  const nowIdBackfillRan = React.useRef(false);
+
+  // Rhei tap debounce: optimistic state per item + pending timers
+  const [pendingRheiState, setPendingRheiState] = useState<Record<string, boolean>>({});
+  const pendingRheiTimers = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const RHEI_DEBOUNCE_MS = 2500;
 
   // Minimize state
   const [minimized, setMinimized] = useState(true);
@@ -235,10 +238,6 @@ export default function EventList() {
     fetch("/api/pomodoro-sessions")
       .then(res => res.json())
       .then(data => setPomodoroSessions(Array.isArray(data) ? data : []));
-
-    fetch("/api/workouts")
-      .then(res => res.json())
-      .then(data => setWorkoutEntries(Array.isArray(data) ? data : []));
 
     fetch("/api/rhei")
       .then(res => res.json())
@@ -338,15 +337,6 @@ export default function EventList() {
     });
   };
 
-  const saveWorkoutEntries = async (entries: WorkoutEntry[]) => {
-    setWorkoutEntries(entries);
-    await fetch("/api/workouts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(entries),
-    });
-  };
-
   const saveRheiItems = async (items: RheiItem[]) => {
     setRheiItems(items);
     await fetch("/api/rhei", {
@@ -361,6 +351,12 @@ export default function EventList() {
   const isRheiEngagedToday = (itemId: string): boolean => {
     const item = rheiItems.find(r => r.id === itemId);
     return item?.engagements.some(e => e.date === todayStr && !e.removedAt) ?? false;
+  };
+
+  // Effective state respects an in-flight pending tap; falls back to committed state.
+  const isRheiEngagedTodayEffective = (itemId: string): boolean => {
+    if (itemId in pendingRheiState) return pendingRheiState[itemId];
+    return isRheiEngagedToday(itemId);
   };
 
   const handleAddRheiItem = () => {
@@ -411,6 +407,37 @@ export default function EventList() {
   };
 
   const handleToggleRheiEngagement = (itemId: string) => {
+    const committed = isRheiEngagedToday(itemId);
+    const effective = isRheiEngagedTodayEffective(itemId);
+    const next = !effective;
+
+    // Clear any in-flight timer for this item — we're re-arming.
+    const existingTimer = pendingRheiTimers.current[itemId];
+    if (existingTimer) clearTimeout(existingTimer);
+    delete pendingRheiTimers.current[itemId];
+
+    if (next === committed) {
+      // User reverted to committed state within window — drop pending entirely.
+      setPendingRheiState(prev => {
+        const { [itemId]: _, ...rest } = prev;
+        return rest;
+      });
+      return;
+    }
+
+    setPendingRheiState(prev => ({ ...prev, [itemId]: next }));
+
+    pendingRheiTimers.current[itemId] = setTimeout(() => {
+      delete pendingRheiTimers.current[itemId];
+      setPendingRheiState(prev => {
+        const { [itemId]: _, ...rest } = prev;
+        return rest;
+      });
+      commitRheiToggle(itemId);
+    }, RHEI_DEBOUNCE_MS);
+  };
+
+  const commitRheiToggle = (itemId: string) => {
     const ts = now();
     const item = rheiItems.find(r => r.id === itemId);
     if (!item) return;
@@ -501,14 +528,6 @@ export default function EventList() {
     setRheiAddendumText(prev => ({ ...prev, [itemId]: '' }));
   };
 
-  const logWorkout = () => {
-    const entry: WorkoutEntry = {
-      id: Math.random().toString(36).substr(2, 9),
-      timestamp: now(),
-    };
-    saveWorkoutEntries([...workoutEntries, entry]);
-  };
-
   const savePomodoroSessions = async (sessions: PomodoroSession[]) => {
     setPomodoroSessions(sessions);
     await fetch("/api/pomodoro-sessions", {
@@ -517,6 +536,25 @@ export default function EventList() {
       body: JSON.stringify(sessions),
     });
   };
+
+  // One-shot backfill: when both sessions and rhei are loaded, link existing sessions to nowId by taskText match.
+  useEffect(() => {
+    if (nowIdBackfillRan.current) return;
+    if (pomodoroSessions.length === 0 || rheiItems.length === 0) return;
+    let patched = false;
+    const updated = pomodoroSessions.map(s => {
+      if (s.nowId !== undefined && s.nowId !== null) return s;
+      if (!s.taskText) return { ...s, nowId: s.nowId ?? null };
+      const match = rheiItems.find(r => r.text === s.taskText);
+      if (match) {
+        patched = true;
+        return { ...s, nowId: match.id };
+      }
+      return { ...s, nowId: s.nowId ?? null };
+    });
+    nowIdBackfillRan.current = true;
+    if (patched) savePomodoroSessions(updated);
+  }, [pomodoroSessions, rheiItems]);
 
   const tasksForSelectedDate = useMemo(() => {
     return dailyTasks
@@ -615,7 +653,9 @@ export default function EventList() {
     const newTodo: TodoItem = {
       id: Math.random().toString(36).substr(2, 9),
       text: newTodoText.trim(),
-      completed: false
+      completed: false,
+      createdAt: now(),
+      completedAt: null,
     };
     setFormData(prev => ({
       ...prev,
@@ -636,7 +676,7 @@ export default function EventList() {
       if (ev.id === eventId) {
         return {
           ...ev,
-          todos: (ev.todos || []).map(t => t.id === todoId ? { ...t, completed: !t.completed } : t)
+          todos: (ev.todos || []).map(t => t.id === todoId ? { ...t, completed: !t.completed, completedAt: !t.completed ? now() : null } : t)
         };
       }
       return ev;
@@ -645,7 +685,8 @@ export default function EventList() {
   };
 
   const handleNextActionChange = async (eventId: string, nextAction: string) => {
-    const updatedEvents = events.map(ev => ev.id === eventId ? { ...ev, nextAction: nextAction || undefined } : ev);
+    const trimmed = nextAction.trim();
+    const updatedEvents = events.map(ev => ev.id === eventId ? { ...ev, nextAction: trimmed || undefined } : ev);
     await saveEvents(updatedEvents);
   };
 
@@ -693,12 +734,14 @@ export default function EventList() {
     e.preventDefault();
     if (!formData.name || !formData.dueDate) return;
 
+    const cleanedFormData = { ...formData, nextAction: formData.nextAction?.trim() || undefined };
+
     let updatedEvents;
     if (editingId) {
-      updatedEvents = events.map(ev => ev.id === editingId ? { ...ev, ...formData, id: editingId } : ev);
+      updatedEvents = events.map(ev => ev.id === editingId ? { ...ev, ...cleanedFormData, id: editingId } : ev);
     } else {
       const newEvent: EventItem = {
-        ...formData,
+        ...cleanedFormData,
         id: Math.random().toString(36).substr(2, 9),
         status: 'active',
         createdAt: now(),
@@ -786,7 +829,7 @@ export default function EventList() {
       return {
         ...ev,
         description: gardenDesc,
-        nextAction: gardenNextAction || undefined,
+        nextAction: gardenNextAction.trim() || undefined,
         todos: gardenTodos,
         gardenedAt: ts,
       };
@@ -826,16 +869,24 @@ export default function EventList() {
     const taskText = dailyTask?.text || subtask?.text || null;
     const resolvedEventId = pomodoroEventId || dailyTask?.linkedEventId || null;
     const resolvedEventName = event?.name || (dailyTask?.linkedEventId ? events.find(e => e.id === dailyTask.linkedEventId)?.name : null) || null;
+    // Propagate rhei link if the source daily task was created from a Now item, else fall back to text match.
+    const resolvedNowId = dailyTask?.rheiItemId
+      || (taskText ? rheiItems.find(r => r.text === taskText)?.id : null)
+      || null;
+    // Auto-mark anything under 60s as aborted (unless it was deliberately categorized).
+    const finalOutcome: PomodoroSession['outcome'] =
+      outcome === 'completed' && durationSeconds < 60 ? 'aborted' : outcome;
     const session: PomodoroSession = {
       id: Math.random().toString(36).substr(2, 9),
       taskId: pomodoroTaskId,
       taskText,
       eventId: resolvedEventId,
       eventName: resolvedEventName,
+      nowId: resolvedNowId,
       startedAt: pomodoroStartedAt || now(),
       completedAt: now(),
       durationSeconds,
-      outcome,
+      outcome: finalOutcome,
       ...(forceMajeureReason && { forceMajeureReason }),
     };
     savePomodoroSessions([...pomodoroSessions, session]);
@@ -904,7 +955,7 @@ export default function EventList() {
     } else {
       const session: PomodoroSession = {
         id: Math.random().toString(36).substr(2, 9),
-        taskId: null, taskText: null, eventId: null, eventName: null,
+        taskId: null, taskText: null, eventId: null, eventName: null, nowId: null,
         startedAt: now(), completedAt: now(), durationSeconds: 0,
         outcome: 'forceMajeure',
         forceMajeureReason: reason,
@@ -1033,12 +1084,14 @@ export default function EventList() {
       id: Math.random().toString(36).substr(2, 9),
       text: gardenNewTodo.trim(),
       completed: false,
+      createdAt: now(),
+      completedAt: null,
     }]);
     setGardenNewTodo("");
   };
 
   const gardenToggleTodo = (todoId: string) => {
-    setGardenTodos(prev => prev.map(t => t.id === todoId ? { ...t, completed: !t.completed } : t));
+    setGardenTodos(prev => prev.map(t => t.id === todoId ? { ...t, completed: !t.completed, completedAt: !t.completed ? now() : null } : t));
   };
 
   if (!mounted) return null;
@@ -1547,7 +1600,7 @@ export default function EventList() {
                         className={`${styles.taskContent} ${styles.rheiItem}`}
                         onClick={() => handleToggleRheiEngagement(item.id)}
                       >
-                        <div className={`${styles.taskText} ${isRheiEngagedToday(item.id) ? styles.rheiItemActive : ''}`}>
+                        <div className={`${styles.taskText} ${isRheiEngagedTodayEffective(item.id) ? styles.rheiItemActive : ''}`}>
                           {item.text}
                           {item.scheduledTasks && item.scheduledTasks.length > 0 && <Calendar size={12} className={styles.rheiScheduledIcon} />}
                         </div>
@@ -1742,10 +1795,20 @@ export default function EventList() {
       </div>
 
       <div className={styles.bottomButtons}>
-        <button className={styles.gardenButton} onClick={logWorkout} style={workoutEntries.some(e => e.timestamp.startsWith(todayStr)) ? { fontWeight: 700 } : undefined}>
-          Worked Out
-        </button>
-        <button className={styles.gardenButton} onClick={() => setForceMajeurePrompt(!forceMajeurePrompt)} style={pomodoroSessions.some(s => s.outcome === 'forceMajeure' && s.completedAt.startsWith(todayStr)) ? { fontWeight: 700 } : undefined}>
+        {(() => {
+          const exercise = rheiItems.find(r => r.text === 'Exercise');
+          if (!exercise) return null;
+          return (
+            <button
+              className={styles.gardenButton}
+              onClick={() => handleToggleRheiEngagement(exercise.id)}
+              style={isRheiEngagedTodayEffective(exercise.id) ? { textDecoration: 'line-through' } : undefined}
+            >
+              Worked Out
+            </button>
+          );
+        })()}
+        <button className={styles.gardenButton} onClick={() => setForceMajeurePrompt(!forceMajeurePrompt)} style={pomodoroSessions.some(s => s.outcome === 'forceMajeure' && s.completedAt.startsWith(todayStr)) ? { textDecoration: 'line-through' } : undefined}>
           Force Majeure
         </button>
         {forceMajeurePrompt && (
@@ -1767,7 +1830,7 @@ export default function EventList() {
           </div>
         )}
         {gardenEvents.length > 0 && (
-          <button className={styles.gardenButton} onClick={startGardening} style={gardenEvents.every(ev => ev.gardenedAt?.startsWith(todayStr)) ? { fontWeight: 700 } : undefined}>
+          <button className={styles.gardenButton} onClick={startGardening} style={gardenEvents.every(ev => ev.gardenedAt?.startsWith(todayStr)) ? { textDecoration: 'line-through' } : undefined}>
             Garden
           </button>
         )}
@@ -1797,31 +1860,51 @@ function renderSection(
         const { daysText, weekday } = getDaysData(event.dueDate);
         const isArchived = (event.status || 'active') !== 'active';
         const isExpanded = expandedIds.includes(event.id);
+        const isOTH = title === "Over The Horizon";
+        const gardenAgeDays = event.gardenedAt
+          ? Math.floor((Date.now() - new Date(event.gardenedAt).getTime()) / 86400000)
+          : null;
+        const gardenState: 'never' | 'stale' | 'fresh' = !event.gardenedAt
+          ? 'never'
+          : (gardenAgeDays !== null && gardenAgeDays > 14) ? 'stale' : 'fresh';
+        const showGardenMark = isOTH && !event.starred && gardenState !== 'fresh';
         return (
           <div key={event.id} className={styles.itemWrapper}>
             {event.starred && <span className={styles.starMark} aria-label="starred">★</span>}
+            {showGardenMark && (
+              <span
+                className={`${styles.gardenStateMark} ${gardenState === 'never' ? styles.gardenStateNever : styles.gardenStateStale}`}
+                aria-label={gardenState === 'never' ? 'never gardened' : 'gardened long ago'}
+              >
+                ·
+              </span>
+            )}
             <div className={styles.item} onClick={() => onToggle(event.id)}>
               <div className={styles.itemMain}>
                 <div className={styles.eventNameGroup}>
                   <span className={`${styles.eventName} ${isArchived ? styles.archivedName : ""}`}>{event.name}</span>
-                  {showNextActions && (
-                    <div className={styles.nextActionRow}>
-                      {event.nextAction && <span className={styles.nextActionHyphen}>–</span>}
-                      <input
-                        type="text"
-                        className={styles.nextActionInline}
-                        placeholder="Next Action"
-                        defaultValue={event.nextAction || ""}
-                        onClick={e => e.stopPropagation()}
-                        onBlur={e => {
-                          if (e.target.value !== (event.nextAction || "")) {
-                            onNextActionChange(event.id, e.target.value);
-                          }
-                        }}
-                        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                      />
-                    </div>
-                  )}
+                  {showNextActions && (() => {
+                    const trimmedNextAction = event.nextAction?.trim() || "";
+                    const fallbackTodo = !trimmedNextAction ? event.todos?.find(t => !t.completed)?.text : undefined;
+                    return (
+                      <div className={styles.nextActionRow}>
+                        {(trimmedNextAction || fallbackTodo) && <span className={styles.nextActionHyphen}>–</span>}
+                        <input
+                          type="text"
+                          className={styles.nextActionInline}
+                          placeholder={fallbackTodo || "Next Action"}
+                          defaultValue={trimmedNextAction}
+                          onClick={e => e.stopPropagation()}
+                          onBlur={e => {
+                            if (e.target.value !== (event.nextAction || "")) {
+                              onNextActionChange(event.id, e.target.value);
+                            }
+                          }}
+                          onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                        />
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className={styles.dateGroup}>
                   <span className={styles.daysUntil}>{daysText}</span>
