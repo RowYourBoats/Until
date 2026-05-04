@@ -127,6 +127,16 @@ const getDateStr = (offset: number) => {
   return `${year}-${month}-${day}`;
 };
 
+// Compare a UTC ISO timestamp against a local YYYY-MM-DD string.
+// Stored timestamps are UTC (toISOString); todayStr / tomorrow etc. are local.
+// startsWith() silently breaks when local date != UTC date.
+const isLocalDate = (iso: string | null | undefined, dateStr: string) => {
+  if (!iso) return false;
+  const d = new Date(iso);
+  const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return local === dateStr;
+};
+
 export default function EventList() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
@@ -1797,18 +1807,17 @@ export default function EventList() {
       <div className={styles.bottomButtons}>
         {(() => {
           const exercise = rheiItems.find(r => r.text === 'Exercise');
-          if (!exercise) return null;
           return (
             <button
               className={styles.gardenButton}
-              onClick={() => handleToggleRheiEngagement(exercise.id)}
-              style={isRheiEngagedTodayEffective(exercise.id) ? { textDecoration: 'line-through' } : undefined}
+              onClick={() => exercise && handleToggleRheiEngagement(exercise.id)}
+              style={exercise && isRheiEngagedTodayEffective(exercise.id) ? { textDecoration: 'line-through' } : undefined}
             >
               Worked Out
             </button>
           );
         })()}
-        <button className={styles.gardenButton} onClick={() => setForceMajeurePrompt(!forceMajeurePrompt)} style={pomodoroSessions.some(s => s.outcome === 'forceMajeure' && s.completedAt.startsWith(todayStr)) ? { textDecoration: 'line-through' } : undefined}>
+        <button className={styles.gardenButton} onClick={() => setForceMajeurePrompt(!forceMajeurePrompt)} style={pomodoroSessions.some(s => s.outcome === 'forceMajeure' && isLocalDate(s.completedAt, todayStr)) ? { textDecoration: 'line-through' } : undefined}>
           Force Majeure
         </button>
         {forceMajeurePrompt && (
@@ -1830,7 +1839,7 @@ export default function EventList() {
           </div>
         )}
         {gardenEvents.length > 0 && (
-          <button className={styles.gardenButton} onClick={startGardening} style={gardenEvents.every(ev => ev.gardenedAt?.startsWith(todayStr)) ? { textDecoration: 'line-through' } : undefined}>
+          <button className={styles.gardenButton} onClick={startGardening} style={gardenEvents.every(ev => isLocalDate(ev.gardenedAt, todayStr)) ? { textDecoration: 'line-through' } : undefined}>
             Garden
           </button>
         )}
