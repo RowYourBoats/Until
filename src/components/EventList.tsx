@@ -1635,11 +1635,19 @@ export default function EventList() {
                       </div>
                     </>
                   )}
-                  {isRheiEngagedTodayEffective(item.id) && editingRheiId !== item.id && (
-                    <div className={styles.rheiAddenda}>
-                      {dailyTasks
-                        .filter(t => t.rheiItemId === item.id && t.date === todayStr && t.text !== item.text)
-                        .map(task => (
+                  {isRheiEngagedTodayEffective(item.id) && editingRheiId !== item.id && (() => {
+                    const existingTasks = dailyTasks.filter(t => t.rheiItemId === item.id && t.date === todayStr && t.text !== item.text);
+                    const isPending = pendingRheiState[item.id] === true && !isRheiEngagedToday(item.id);
+                    const todayDay = new Date().getDay();
+                    const previewScheduled = isPending && item.scheduledTasks
+                      ? item.scheduledTasks
+                          .filter(st => st.days.includes(todayDay))
+                          .filter(st => !existingTasks.some(t => t.text === `${item.text} - ${st.text}`))
+                          .map(st => ({ stText: st.text, fullText: `${item.text} - ${st.text}` }))
+                      : [];
+                    return (
+                      <div className={styles.rheiAddenda}>
+                        {existingTasks.map(task => (
                           <div key={task.id} className={styles.rheiAddendumRow}>
                             <input
                               type="checkbox"
@@ -1659,17 +1667,24 @@ export default function EventList() {
                             </button>
                           </div>
                         ))}
-                      <input
-                        type="text"
-                        className={styles.rheiAddendumInput}
-                        placeholder="Add sub-task..."
-                        value={rheiAddendumText[item.id] || ''}
-                        onChange={e => setRheiAddendumText(prev => ({ ...prev, [item.id]: e.target.value }))}
-                        onKeyDown={e => { if (e.key === 'Enter') handleAddRheiAddendum(item.id); }}
-                        onClick={e => e.stopPropagation()}
-                      />
-                    </div>
-                  )}
+                        {previewScheduled.map(p => (
+                          <div key={`__preview_${p.stText}`} className={styles.rheiAddendumRow} style={{ opacity: 0.4 }}>
+                            <input type="checkbox" checked={false} readOnly className={styles.taskCheckbox} />
+                            <span className={styles.rheiAddendumText}>{p.stText}</span>
+                          </div>
+                        ))}
+                        <input
+                          type="text"
+                          className={styles.rheiAddendumInput}
+                          placeholder="Add sub-task..."
+                          value={rheiAddendumText[item.id] || ''}
+                          onChange={e => setRheiAddendumText(prev => ({ ...prev, [item.id]: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter') handleAddRheiAddendum(item.id); }}
+                          onClick={e => e.stopPropagation()}
+                        />
+                      </div>
+                    );
+                  })()}
                 </motion.div>
               ))}
             </AnimatePresence>
