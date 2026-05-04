@@ -14,6 +14,8 @@ import styles from "./EventList.module.css";
 const TODAY = new Date();
 TODAY.setHours(0, 0, 0, 0);
 
+const isPersonal = !process.env.NEXT_PUBLIC_VERCEL_ENV;
+
 type TagType = "grants" | "exhibitions" | "competitions" | "submissions" | "residencies" | "images" | "text";
 
 interface TodoItem {
@@ -1400,7 +1402,7 @@ export default function EventList() {
             className={`${styles.dateNavBtn} ${dailyDateTab === 'rhei' ? styles.dateNavActive : ''}`}
             onClick={() => setDailyDateTab('rhei')}
           >
-            Now
+            Repeating
           </button>
         </div>
 
@@ -1712,15 +1714,15 @@ export default function EventList() {
         </button>
         <button
           className={`${styles.tabBtn} ${styles.tabActive}`}
-          onClick={() => { minimizedLockedRef.current = !minimizedLockedRef.current; setMinimized(minimizedLockedRef.current); }}
+          onClick={() => { setIsAdding(!isAdding); setEditingId(null); }}
         >
-          {minimized ? '|' : '–'}
+          {isAdding ? '×' : (isPersonal ? '+' : 'New')}
         </button>
         <button
           className={`${styles.tabBtn} ${styles.tabActive}`}
-          onClick={() => { setIsAdding(!isAdding); setEditingId(null); }}
+          onClick={() => { minimizedLockedRef.current = !minimizedLockedRef.current; setMinimized(minimizedLockedRef.current); }}
         >
-          {isAdding ? '×' : '+'}
+          {isPersonal ? (minimized ? '|' : '–') : (minimized ? 'Max' : 'Mini')}
         </button>
       </div>
 
