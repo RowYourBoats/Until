@@ -54,12 +54,19 @@
 }
 
 body {
-  background: #293c64;
+  background: var(--background);
   color: var(--foreground);
   font-family: var(--font-family);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Desktop letterbox: dark surround when the centered container is narrower than the viewport. Mobile (single column) keeps body color so iOS chrome tints to match the app. */
+@media (min-width: 600px) {
+  body {
+    background: #293c64;
+  }
 }
 
 a {
