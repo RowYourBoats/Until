@@ -139,3 +139,5 @@ Toggle between light and dark mode using the **Day** / **Night** button in the h
 ## Personal vs. public version
 
 The codebase exposes an `isPersonal` flag (`!process.env.NEXT_PUBLIC_VERCEL_ENV`) that is `true` locally and `false` on Vercel. It's currently unused at the UI level — both versions look the same — but kept available for future per-version branching. The Vercel deployment is read-only at runtime; data writes do not persist between cold starts.
+
+When the local `data/` directory is empty (as on Vercel), the API routes fall back to a tracked `data-example/` folder containing fictional but plausible content. Visitors see a working, populated UI; nothing they do persists.

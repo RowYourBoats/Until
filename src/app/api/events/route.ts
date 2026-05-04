@@ -3,6 +3,7 @@ import fs from "fs/promises";
 import path from "path";
 
 const filePath = path.join(process.cwd(), "data", "events.json");
+const examplePath = path.join(process.cwd(), "data-example", "events.json");
 const projectsRoot = path.join(process.cwd(), "projects");
 
 async function ensureDirs() {
@@ -37,8 +38,13 @@ export async function GET() {
   try {
     const data = await fs.readFile(filePath, "utf8");
     return NextResponse.json(JSON.parse(data));
-  } catch (error) {
-    return NextResponse.json([], { status: 200 });
+  } catch {
+    try {
+      const data = await fs.readFile(examplePath, "utf8");
+      return NextResponse.json(JSON.parse(data));
+    } catch {
+      return NextResponse.json([], { status: 200 });
+    }
   }
 }
 

@@ -1,0 +1,98 @@
+[
+  {
+    "id": "po_drift_1",
+    "taskId": "dt_y_drift",
+    "taskText": "Sketch room layout for Drift",
+    "eventId": "ev_drift",
+    "eventName": "Solo Show: Drift",
+    "nowId": null,
+    "startedAt": "2026-05-03T15:50:00.000Z",
+    "completedAt": "2026-05-03T16:25:00.000Z",
+    "durationSeconds": 2100,
+    "outcome": "completed"
+  },
+  {
+    "id": "po_skill_1",
+    "taskId": "dt_y_skill",
+    "taskText": "Outline skill submission structure",
+    "eventId": "ev_skill",
+    "eventName": "Claude Agent Skill Submission",
+    "nowId": null,
+    "startedAt": "2026-05-03T13:00:00.000Z",
+    "completedAt": "2026-05-03T13:35:00.000Z",
+    "durationSeconds": 2100,
+    "outcome": "completed"
+  },
+  {
+    "id": "po_unreal_y",
+    "taskId": null,
+    "taskText": "Practice Unreal",
+    "eventId": null,
+    "eventName": null,
+    "nowId": "rh_unreal",
+    "startedAt": "2026-05-03T17:00:00.000Z",
+    "completedAt": "2026-05-03T17:35:00.000Z",
+    "durationSeconds": 2100,
+    "outcome": "completed"
+  },
+  {
+    "id": "po_drift_t",
+    "taskId": "dt_t_drift_outline",
+    "taskText": "Outline Drift artist statement",
+    "eventId": "ev_drift",
+    "eventName": "Solo Show: Drift",
+    "nowId": null,
+    "startedAt": "2026-05-04T10:00:00.000Z",
+    "completedAt": "2026-05-04T10:35:00.000Z",
+    "durationSeconds": 2100,
+    "outcome": "completed"
+  },
+  {
+    "id": "po_skill_fresh",
+    "taskId": "dt_t_skill_polish",
+    "taskText": "Polish skill prompt template",
+    "eventId": "ev_skill",
+    "eventName": "Claude Agent Skill Submission",
+    "nowId": null,
+    "startedAt": "2026-05-04T11:15:00.000Z",
+    "completedAt": "2026-05-04T11:23:00.000Z",
+    "durationSeconds": 480,
+    "outcome": "fresh"
+  },
+  {
+    "id": "po_aborted",
+    "taskId": null,
+    "taskText": null,
+    "eventId": null,
+    "eventName": null,
+    "nowId": null,
+    "startedAt": "2026-05-04T11:24:00.000Z",
+    "completedAt": "2026-05-04T11:24:11.000Z",
+    "durationSeconds": 11,
+    "outcome": "aborted"
+  },
+  {
+    "id": "po_video",
+    "taskId": "dt_t_video_capture",
+    "taskText": "Screen capture pass for tutorial",
+    "eventId": "ev_video",
+    "eventName": "Code Connect Tutorial",
+    "nowId": null,
+    "startedAt": "2026-05-04T13:00:00.000Z",
+    "completedAt": "2026-05-04T13:35:00.000Z",
+    "durationSeconds": 2100,
+    "outcome": "completed"
+  },
+  {
+    "id": "po_unreal_t",
+    "taskId": "dt_t_rh_unreal",
+    "taskText": "Practice Unreal",
+    "eventId": null,
+    "eventName": null,
+    "nowId": "rh_unreal",
+    "startedAt": "2026-05-04T14:00:00.000Z",
+    "completedAt": "2026-05-04T14:35:00.000Z",
+    "durationSeconds": 2100,
+    "outcome": "completed"
+  }
+]

@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Countdown-based task manager and deadline tracker',
     start_url: '/',
     display: 'standalone',
-    background_color: '#ffffff',
-    theme_color: '#000000',
+    background_color: '#293c64',
+    theme_color: '#293c64',
 icons: [
   {
     src: '/icons/icon-192x192.png', // Match your actual folder/filename

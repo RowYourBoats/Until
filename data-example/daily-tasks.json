@@ -1,0 +1,134 @@
+[
+  {
+    "id": "dt_y_drift",
+    "text": "Sketch room layout for Drift",
+    "completed": true,
+    "date": "2026-05-03",
+    "linkedEventId": "ev_drift",
+    "createdAt": "2026-05-03T09:00:00.000Z",
+    "completedAt": "2026-05-03T16:30:00.000Z",
+    "changes": ["2026-05-03T09:00:00.000Z", "2026-05-03T16:30:00.000Z"]
+  },
+  {
+    "id": "dt_y_skill",
+    "text": "Outline skill submission structure",
+    "completed": true,
+    "date": "2026-05-03",
+    "linkedEventId": "ev_skill",
+    "createdAt": "2026-05-03T10:30:00.000Z",
+    "completedAt": "2026-05-03T13:45:00.000Z",
+    "changes": ["2026-05-03T10:30:00.000Z", "2026-05-03T13:45:00.000Z"]
+  },
+  {
+    "id": "dt_y_rh_unreal",
+    "text": "Practice Unreal",
+    "completed": true,
+    "date": "2026-05-03",
+    "rheiItemId": "rh_unreal",
+    "createdAt": "2026-05-03T16:00:00.000Z",
+    "completedAt": "2026-05-03T18:30:00.000Z",
+    "changes": ["2026-05-03T16:00:00.000Z"]
+  },
+
+  {
+    "id": "dt_t_drift_outline",
+    "text": "Outline Drift artist statement",
+    "completed": false,
+    "date": "2026-05-04",
+    "linkedEventId": "ev_drift",
+    "createdAt": "2026-05-04T08:30:00.000Z",
+    "completedAt": null,
+    "changes": ["2026-05-04T08:30:00.000Z"]
+  },
+  {
+    "id": "dt_t_skill_polish",
+    "text": "Polish skill prompt template",
+    "completed": false,
+    "date": "2026-05-04",
+    "linkedEventId": "ev_skill",
+    "createdAt": "2026-05-04T08:35:00.000Z",
+    "completedAt": null,
+    "changes": ["2026-05-04T08:35:00.000Z"]
+  },
+  {
+    "id": "dt_t_td_email",
+    "text": "Email TD mentor for letter",
+    "completed": true,
+    "date": "2026-05-04",
+    "linkedEventId": "ev_td",
+    "createdAt": "2026-05-04T08:00:00.000Z",
+    "completedAt": "2026-05-04T08:00:00.000Z",
+    "changes": ["2026-05-04T08:00:00.000Z", "2026-05-04T08:00:00.000Z"]
+  },
+  {
+    "id": "dt_t_video_capture",
+    "text": "Screen capture pass for tutorial",
+    "completed": false,
+    "date": "2026-05-04",
+    "linkedEventId": "ev_video",
+    "createdAt": "2026-05-04T09:00:00.000Z",
+    "completedAt": null,
+    "changes": ["2026-05-04T09:00:00.000Z"]
+  },
+  {
+    "id": "dt_t_rh_unreal",
+    "text": "Practice Unreal",
+    "completed": false,
+    "date": "2026-05-04",
+    "rheiItemId": "rh_unreal",
+    "createdAt": "2026-05-04T13:30:00.000Z",
+    "completedAt": null,
+    "changes": ["2026-05-04T13:30:00.000Z"]
+  },
+  {
+    "id": "dt_t_rh_papers",
+    "text": "Read AI Papers",
+    "completed": true,
+    "date": "2026-05-04",
+    "rheiItemId": "rh_papers",
+    "createdAt": "2026-05-04T08:45:00.000Z",
+    "completedAt": "2026-05-04T09:30:00.000Z",
+    "changes": ["2026-05-04T08:45:00.000Z"]
+  },
+  {
+    "id": "dt_t_rh_papers_sched",
+    "text": "Read AI Papers - NeurIPS pick",
+    "completed": false,
+    "date": "2026-05-04",
+    "rheiItemId": "rh_papers",
+    "createdAt": "2026-05-04T08:45:00.000Z",
+    "completedAt": null,
+    "changes": ["2026-05-04T08:45:00.000Z"]
+  },
+  {
+    "id": "dt_t_rh_exercise",
+    "text": "Exercise",
+    "completed": true,
+    "date": "2026-05-04",
+    "rheiItemId": "rh_exercise",
+    "createdAt": "2026-05-04T07:30:00.000Z",
+    "completedAt": "2026-05-04T08:15:00.000Z",
+    "changes": ["2026-05-04T07:30:00.000Z"]
+  },
+
+  {
+    "id": "dt_tm_drift_renders",
+    "text": "Renders for Drift proposal PDF",
+    "completed": false,
+    "date": "2026-05-05",
+    "linkedEventId": "ev_drift",
+    "createdAt": "2026-05-04T09:15:00.000Z",
+    "completedAt": null,
+    "changes": ["2026-05-04T09:15:00.000Z"]
+  },
+  {
+    "id": "dt_tm_td_abstract",
+    "text": "Draft 250-word abstract for TD Summit",
+    "completed": false,
+    "date": "2026-05-05",
+    "linkedEventId": "ev_td",
+    "createdAt": "2026-05-04T09:20:00.000Z",
+    "completedAt": null,
+    "changes": ["2026-05-04T09:20:00.000Z"]
+  }
+]

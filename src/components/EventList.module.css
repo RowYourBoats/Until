@@ -760,6 +760,13 @@
   align-items: center;
   gap: 2rem;
   padding: 0.667rem 0;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 480px) {
+  .dateNav {
+    gap: 1rem;
+  }
 }
 
 .dateNavBtn {

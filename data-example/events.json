@@ -1,0 +1,148 @@
+[
+  {
+    "id": "ev_drift",
+    "name": "Solo Show: Drift",
+    "dueDate": "2027-02-01",
+    "description": "First solo show concept — six interactive video installations exploring slow algorithmic drift through generative landscapes. Looking at venues with capacity for low-light room-scale projection. Needs portfolio, artist statement, technical specs, budget.",
+    "url": "",
+    "tags": ["exhibitions", "proposal", "text", "images"],
+    "todos": [
+      { "id": "td_drift_1", "text": "Outline artist statement", "completed": false, "createdAt": "2026-04-28T15:00:00.000Z", "completedAt": null },
+      { "id": "td_drift_2", "text": "Renders for proposal PDF", "completed": false, "createdAt": "2026-04-28T15:00:00.000Z", "completedAt": null },
+      { "id": "td_drift_3", "text": "Reach out to Phi Centre", "completed": false, "createdAt": "2026-04-28T15:00:00.000Z", "completedAt": null },
+      { "id": "td_drift_4", "text": "Confirm room dimensions", "completed": true, "createdAt": "2026-04-15T10:00:00.000Z", "completedAt": "2026-04-22T18:00:00.000Z" }
+    ],
+    "status": "active",
+    "nextAction": "Outline artist statement",
+    "createdAt": "2026-04-15T09:00:00.000Z",
+    "completedAt": null,
+    "gardenedAt": "2026-05-02T19:00:00.000Z",
+    "starred": true
+  },
+  {
+    "id": "ev_skill",
+    "name": "Claude Agent Skill Submission",
+    "dueDate": "2026-05-20",
+    "description": "Building a Claude Code skill for translating Figma component nodes into TouchDesigner network snippets. Submit to Anthropic's skills directory. Need clean prompt template, example payloads, README, and a short demo video.",
+    "url": "https://docs.anthropic.com/claude/docs/skills",
+    "tags": ["code", "text", "video"],
+    "todos": [
+      { "id": "td_skill_1", "text": "Polish skill prompt", "completed": false, "createdAt": "2026-04-30T14:00:00.000Z", "completedAt": null },
+      { "id": "td_skill_2", "text": "Record 90s demo video", "completed": false, "createdAt": "2026-04-30T14:00:00.000Z", "completedAt": null },
+      { "id": "td_skill_3", "text": "Write submission README", "completed": false, "createdAt": "2026-04-30T14:00:00.000Z", "completedAt": null }
+    ],
+    "status": "active",
+    "createdAt": "2026-04-30T13:00:00.000Z",
+    "completedAt": null,
+    "gardenedAt": null
+  },
+  {
+    "id": "ev_td",
+    "name": "TouchDesigner Summit Workshop",
+    "dueDate": "2026-05-15",
+    "description": "Workshop pitch for the TD Summit in Berlin — three-hour intensive on shader-driven generative environments. Requires speaker bio, CV, abstract, sample work links.",
+    "url": "https://derivative.ca/community-post/td-summit-2026",
+    "tags": ["conference", "video", "cv", "proposal"],
+    "todos": [
+      { "id": "td_td_1", "text": "Email mentor for letter", "completed": true, "createdAt": "2026-04-25T11:00:00.000Z", "completedAt": "2026-05-04T08:00:00.000Z" },
+      { "id": "td_td_2", "text": "Draft 250-word abstract", "completed": false, "createdAt": "2026-04-25T11:00:00.000Z", "completedAt": null },
+      { "id": "td_td_3", "text": "Update CV", "completed": false, "createdAt": "2026-04-25T11:00:00.000Z", "completedAt": null }
+    ],
+    "status": "active",
+    "createdAt": "2026-04-25T11:00:00.000Z",
+    "completedAt": null,
+    "gardenedAt": null
+  },
+  {
+    "id": "ev_video",
+    "name": "Code Connect Tutorial",
+    "dueDate": "2026-05-10",
+    "description": "Short tutorial video on Figma Code Connect → React Native handoff. For the studio newsletter. ~6 minutes, screen recording with voiceover.",
+    "url": "",
+    "tags": ["video", "text", "code"],
+    "todos": [
+      { "id": "td_video_1", "text": "Script outline", "completed": true, "createdAt": "2026-04-26T16:00:00.000Z", "completedAt": "2026-04-29T10:00:00.000Z" },
+      { "id": "td_video_2", "text": "Screen capture pass", "completed": false, "createdAt": "2026-04-26T16:00:00.000Z", "completedAt": null },
+      { "id": "td_video_3", "text": "Voiceover", "completed": false, "createdAt": "2026-04-26T16:00:00.000Z", "completedAt": null }
+    ],
+    "status": "active",
+    "nextAction": "Screen capture pass",
+    "createdAt": "2026-04-26T16:00:00.000Z",
+    "completedAt": null,
+    "gardenedAt": "2026-04-30T20:00:00.000Z"
+  },
+  {
+    "id": "ev_genfest",
+    "name": "Generative Art Festival — Open Call",
+    "dueDate": "2026-08-01",
+    "description": "Annual juried festival in Lisbon. Open call for screen-based or installation works under 8 minutes. Selected works receive a €1500 honorarium and travel.",
+    "url": "https://genartfest.example/open-call-2026",
+    "tags": ["competitions", "funded", "video", "code"],
+    "todos": [
+      { "id": "td_gen_1", "text": "Pick three candidate works", "completed": false, "createdAt": "2026-04-20T12:00:00.000Z", "completedAt": null },
+      { "id": "td_gen_2", "text": "Bilingual statement (EN/PT)", "completed": false, "createdAt": "2026-04-20T12:00:00.000Z", "completedAt": null }
+    ],
+    "status": "active",
+    "createdAt": "2026-04-20T12:00:00.000Z",
+    "completedAt": null,
+    "gardenedAt": "2026-04-29T14:00:00.000Z"
+  },
+  {
+    "id": "ev_unreal",
+    "name": "Unreal Plugin: Generative Worlds",
+    "dueDate": "2026-09-15",
+    "description": "Open-source plugin exposing a node-based interface for procedural landscape generation in Unreal 5.4. Long-tail project. Goal: alpha by mid-September, paper writeup for SIGGRAPH next year.",
+    "url": "https://github.com/example/unreal-genworlds",
+    "tags": ["code", "portfolio"],
+    "todos": [
+      { "id": "td_unreal_1", "text": "Fix terrain seed bug", "completed": false, "createdAt": "2026-04-08T09:00:00.000Z", "completedAt": null },
+      { "id": "td_unreal_2", "text": "Add HISM batching", "completed": false, "createdAt": "2026-04-08T09:00:00.000Z", "completedAt": null },
+      { "id": "td_unreal_3", "text": "Initial repo scaffold", "completed": true, "createdAt": "2026-04-01T10:00:00.000Z", "completedAt": "2026-04-08T09:00:00.000Z" }
+    ],
+    "status": "active",
+    "createdAt": "2026-04-01T10:00:00.000Z",
+    "completedAt": null,
+    "gardenedAt": "2026-04-12T18:00:00.000Z"
+  },
+  {
+    "id": "ev_grant",
+    "name": "Interactive Installation Grant — Year One",
+    "dueDate": "2026-04-15",
+    "description": "Provincial grant application for an outdoor projection mapping piece. Originally targeted spring deadline; missed it. Need to decide whether to push for the autumn round or drop entirely.",
+    "url": "",
+    "tags": ["grants", "funded", "proposal"],
+    "todos": [
+      { "id": "td_grant_1", "text": "Decide: re-submit autumn or kill", "completed": false, "createdAt": "2026-03-20T09:00:00.000Z", "completedAt": null }
+    ],
+    "status": "active",
+    "createdAt": "2026-03-20T09:00:00.000Z",
+    "completedAt": null,
+    "gardenedAt": null
+  },
+  {
+    "id": "ev_oldfest",
+    "name": "Festival Beyond Innovation",
+    "dueDate": "2026-04-01",
+    "description": "Past-due. Submitted in March; awaiting decision. Notes from organizer suggest end-of-May reply.",
+    "url": "",
+    "tags": ["competitions", "video"],
+    "todos": [],
+    "status": "active",
+    "createdAt": "2026-02-15T11:00:00.000Z",
+    "completedAt": null,
+    "gardenedAt": "2026-04-05T19:00:00.000Z"
+  },
+  {
+    "id": "ev_archived_residency",
+    "name": "Pier 9 Residency Application",
+    "dueDate": "2026-03-10",
+    "description": "Applied; declined. Move on.",
+    "url": "",
+    "tags": ["residencies", "portfolio", "cv"],
+    "todos": [],
+    "status": "incomplete",
+    "createdAt": "2026-02-01T09:00:00.000Z",
+    "completedAt": "2026-03-25T14:00:00.000Z",
+    "gardenedAt": null
+  }
+]
