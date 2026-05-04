@@ -1807,13 +1807,13 @@ export default function EventList() {
           className={`${styles.tabBtn} ${styles.tabActive}`}
           onClick={() => { setIsAdding(!isAdding); setEditingId(null); }}
         >
-          {isAdding ? '×' : (isPersonal ? '+' : 'New')}
+          {isAdding ? '×' : 'New'}
         </button>
         <button
           className={`${styles.tabBtn} ${styles.tabActive}`}
           onClick={() => { minimizedLockedRef.current = !minimizedLockedRef.current; setMinimized(minimizedLockedRef.current); }}
         >
-          {isPersonal ? (minimized ? '|' : '–') : (minimized ? 'Max' : 'Mini')}
+          {minimized ? 'Unfold' : 'Fold'}
         </button>
       </div>
 
