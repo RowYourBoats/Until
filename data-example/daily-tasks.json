@@ -4,7 +4,6 @@
     "text": "Sketch room layout for Drift",
     "completed": true,
     "date": "2026-05-03",
-    "linkedEventId": "ev_drift",
     "createdAt": "2026-05-03T09:00:00.000Z",
     "completedAt": "2026-05-03T16:30:00.000Z",
     "changes": ["2026-05-03T09:00:00.000Z", "2026-05-03T16:30:00.000Z"]
@@ -14,7 +13,6 @@
     "text": "Outline skill submission structure",
     "completed": true,
     "date": "2026-05-03",
-    "linkedEventId": "ev_skill",
     "createdAt": "2026-05-03T10:30:00.000Z",
     "completedAt": "2026-05-03T13:45:00.000Z",
     "changes": ["2026-05-03T10:30:00.000Z", "2026-05-03T13:45:00.000Z"]
@@ -35,7 +33,6 @@
     "text": "Outline Drift artist statement",
     "completed": false,
     "date": "2026-05-04",
-    "linkedEventId": "ev_drift",
     "createdAt": "2026-05-04T08:30:00.000Z",
     "completedAt": null,
     "changes": ["2026-05-04T08:30:00.000Z"]
@@ -45,7 +42,6 @@
     "text": "Polish skill prompt template",
     "completed": false,
     "date": "2026-05-04",
-    "linkedEventId": "ev_skill",
     "createdAt": "2026-05-04T08:35:00.000Z",
     "completedAt": null,
     "changes": ["2026-05-04T08:35:00.000Z"]
@@ -55,7 +51,6 @@
     "text": "Email TD mentor for letter",
     "completed": true,
     "date": "2026-05-04",
-    "linkedEventId": "ev_td",
     "createdAt": "2026-05-04T08:00:00.000Z",
     "completedAt": "2026-05-04T08:00:00.000Z",
     "changes": ["2026-05-04T08:00:00.000Z", "2026-05-04T08:00:00.000Z"]
@@ -65,7 +60,6 @@
     "text": "Screen capture pass for tutorial",
     "completed": false,
     "date": "2026-05-04",
-    "linkedEventId": "ev_video",
     "createdAt": "2026-05-04T09:00:00.000Z",
     "completedAt": null,
     "changes": ["2026-05-04T09:00:00.000Z"]
@@ -116,7 +110,6 @@
     "text": "Renders for Drift proposal PDF",
     "completed": false,
     "date": "2026-05-05",
-    "linkedEventId": "ev_drift",
     "createdAt": "2026-05-04T09:15:00.000Z",
     "completedAt": null,
     "changes": ["2026-05-04T09:15:00.000Z"]
@@ -126,7 +119,6 @@
     "text": "Draft 250-word abstract for TD Summit",
     "completed": false,
     "date": "2026-05-05",
-    "linkedEventId": "ev_td",
     "createdAt": "2026-05-04T09:20:00.000Z",
     "completedAt": null,
     "changes": ["2026-05-04T09:20:00.000Z"]
