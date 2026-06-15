@@ -30,6 +30,18 @@ interface TodoItem {
   completedAt?: string | null;
 }
 
+// Recurring opportunity (residency / grant / competition). Presence of this
+// object marks an event as a recurring template instance. State (watching/open)
+// is never stored — it's computed from openDate − leadDays vs today, so it
+// can't drift. Only dateStatus (a real user action) is persisted.
+interface Recurrence {
+  openDate: string;                          // YYYY-MM-DD — this cycle's application-open date (guess or verified)
+  leadDays: number;                          // surface this many days before openDate
+  dateStatus: 'provisional' | 'confirmed';   // provisional = guessed from last cycle; confirmed = verified on source
+  eligibilityNote?: string;                  // free text shown on the surfaced card
+  cycleLabel?: string;                       // optional display label, e.g. "2026"
+}
+
 interface EventItem {
   id: string;
   name: string;
@@ -42,8 +54,10 @@ interface EventItem {
   nextAction?: string;
   createdAt?: string;
   completedAt?: string | null;
+  closingNote?: string;   // optional note left when marking complete/incomplete
   gardenedAt?: string | null;
   starred?: boolean;
+  recurrence?: Recurrence;
 }
 
 interface DailyTask {
@@ -52,6 +66,7 @@ interface DailyTask {
   completed: boolean;
   date: string;
   linkedEventId?: string;
+  linkedTodoId?: string;
   rheiItemId?: string;
   createdAt?: string;
   completedAt?: string | null;
@@ -125,6 +140,35 @@ const getDaysData = (dateStr: string) => {
 const parseLocalDate = (dateStr: string) => {
   const [year, month, day] = dateStr.split('-').map(Number);
   return new Date(year, month - 1, day);
+};
+
+// Roll a YYYY-MM-DD date forward by n years, for re-arming recurring cycles.
+const addYears = (dateStr: string, n: number) => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return `${year + n}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+};
+
+// surfaceTime for a recurring item: it wakes this many ms before its open date.
+const recurrenceSurfaceTime = (rec: Recurrence) =>
+  parseLocalDate(rec.openDate).getTime() - rec.leadDays * 86400000;
+
+// A recurring item whose window hasn't opened yet but whose DUE date is already imminent
+// (≤15 days out, or overdue). This happens when the user entered a future recurrence date
+// against a near-term deadline: the current cycle is live, so show it as an ordinary active
+// deadline instead of sleeping it into Watching. Far-future recurring items (window not open,
+// deadline still distant) stay dormant in Watching as normal.
+const RECURRENCE_IMMINENT_DAYS = 15;
+const recurrenceImminentOverride = (ev: EventItem) => {
+  if (!ev.recurrence) return false;
+  if (TODAY.getTime() >= recurrenceSurfaceTime(ev.recurrence)) return false; // window already open
+  const dueDiffDays = Math.ceil((parseLocalDate(ev.dueDate).getTime() - TODAY.getTime()) / 86400000);
+  return dueDiffDays <= RECURRENCE_IMMINENT_DAYS;
+};
+
+// Local timestamp (ms) → YYYY-MM-DD, so it can be fed to formatDate.
+const getDateStrFromTime = (ms: number) => {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
 const getDateStr = (offset: number) => {
@@ -216,6 +260,15 @@ export default function EventList() {
   const pendingRheiTimers = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const RHEI_DEBOUNCE_MS = 2500;
 
+  // Subtask promote tap debounce: optimistic state per todo + pending timers
+  const [pendingPromoteState, setPendingPromoteState] = useState<Record<string, boolean>>({});
+  const pendingPromoteTimers = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  // Watching (dormant recurring items) collapsed group — hidden by default, auditable on expand
+  const [showWatching, setShowWatching] = useState(false);
+  // Long Horizon: always visible as a collapsible "Long Horizon (N)" header, folded by default
+  const [showLongHorizon, setShowLongHorizon] = useState(false);
+
   // Minimize state
   const [minimized, setMinimized] = useState(true);
   const [showNextActions, setShowNextActions] = useState(false);
@@ -239,7 +292,13 @@ export default function EventList() {
     tags: [] as TagType[],
     todos: [] as TodoItem[],
     status: 'active' as 'active' | 'completed' | 'incomplete',
-    nextAction: ""
+    nextAction: "",
+    // Recurrence (helper fields; assembled into a recurrence object on save)
+    isRecurring: false,
+    openDate: "",
+    leadDays: 14,
+    eligibilityNote: "",
+    dateStatus: 'provisional' as 'provisional' | 'confirmed',
   });
 
   const [newTodoText, setNewTodoText] = useState("");
@@ -531,6 +590,72 @@ export default function EventList() {
     }
   };
 
+  // A subtask is "promoted today" when a daily task for today links back to it.
+  const isTodoPromotedToday = (todoId: string): boolean =>
+    dailyTasks.some(t => t.linkedTodoId === todoId && t.date === todayStr);
+
+  // Effective state respects an in-flight pending tap; falls back to committed state.
+  const isTodoPromotedTodayEffective = (todoId: string): boolean => {
+    if (todoId in pendingPromoteState) return pendingPromoteState[todoId];
+    return isTodoPromotedToday(todoId);
+  };
+
+  const handlePromoteTodo = (eventId: string, todo: TodoItem) => {
+    const committed = isTodoPromotedToday(todo.id);
+    const effective = isTodoPromotedTodayEffective(todo.id);
+    const next = !effective;
+
+    // Clear any in-flight timer for this todo — we're re-arming.
+    const existingTimer = pendingPromoteTimers.current[todo.id];
+    if (existingTimer) clearTimeout(existingTimer);
+    delete pendingPromoteTimers.current[todo.id];
+
+    if (next === committed) {
+      // User reverted to committed state within window — drop pending entirely.
+      setPendingPromoteState(prev => {
+        const { [todo.id]: _, ...rest } = prev;
+        return rest;
+      });
+      return;
+    }
+
+    setPendingPromoteState(prev => ({ ...prev, [todo.id]: next }));
+
+    pendingPromoteTimers.current[todo.id] = setTimeout(() => {
+      delete pendingPromoteTimers.current[todo.id];
+      setPendingPromoteState(prev => {
+        const { [todo.id]: _, ...rest } = prev;
+        return rest;
+      });
+      commitPromoteTodo(eventId, todo);
+    }, RHEI_DEBOUNCE_MS);
+  };
+
+  const commitPromoteTodo = (eventId: string, todo: TodoItem) => {
+    const ts = now();
+    const existing = dailyTasks.find(t => t.linkedTodoId === todo.id && t.date === todayStr);
+    if (existing) {
+      // Un-promote: remove the open linked task for today only — never drop a completed record.
+      if (!existing.completed) {
+        saveDailyTasks(dailyTasks.filter(t => t.id !== existing.id));
+      }
+    } else {
+      // Promote: add a fresh open daily task linked to the subtask.
+      const newTask: DailyTask = {
+        id: Math.random().toString(36).substr(2, 9),
+        text: todo.text,
+        completed: false,
+        date: todayStr,
+        linkedEventId: eventId,
+        linkedTodoId: todo.id,
+        createdAt: ts,
+        completedAt: null,
+        changes: [ts],
+      };
+      saveDailyTasks([...dailyTasks, newTask]);
+    }
+  };
+
   const handleAddRheiAddendum = (itemId: string) => {
     const text = (rheiAddendumText[itemId] || '').trim();
     if (!text) return;
@@ -603,9 +728,10 @@ export default function EventList() {
 
   const handleToggleDailyTask = (taskId: string) => {
     const ts = now();
+    const task = dailyTasks.find(t => t.id === taskId);
+    const toggled = !(task?.completed);
     const updated = dailyTasks.map(t => {
       if (t.id !== taskId) return t;
-      const toggled = !t.completed;
       return {
         ...t,
         completed: toggled,
@@ -614,6 +740,20 @@ export default function EventList() {
       };
     });
     saveDailyTasks(updated);
+
+    // Two-way sync: mirror completion onto the linked horizon subtask.
+    if (task?.linkedTodoId && task.linkedEventId) {
+      const updatedEvents = events.map(ev => {
+        if (ev.id !== task.linkedEventId) return ev;
+        return {
+          ...ev,
+          todos: (ev.todos || []).map(td => td.id === task.linkedTodoId
+            ? { ...td, completed: toggled, completedAt: toggled ? ts : null }
+            : td),
+        };
+      });
+      saveEvents(updatedEvents);
+    }
   };
 
   const handleDeleteDailyTask = (taskId: string) => {
@@ -695,16 +835,53 @@ export default function EventList() {
   };
 
   const toggleTodoCompletion = async (eventId: string, todoId: string) => {
+    const ts = now();
+    const event = events.find(ev => ev.id === eventId);
+    const todo = event?.todos?.find(t => t.id === todoId);
+    if (!todo) return;
+    const nextCompleted = !todo.completed;
+
     const updatedEvents = events.map(ev => {
       if (ev.id === eventId) {
         return {
           ...ev,
-          todos: (ev.todos || []).map(t => t.id === todoId ? { ...t, completed: !t.completed, completedAt: !t.completed ? now() : null } : t)
+          todos: (ev.todos || []).map(t => t.id === todoId ? { ...t, completed: nextCompleted, completedAt: nextCompleted ? ts : null } : t)
         };
       }
       return ev;
     });
     await saveEvents(updatedEvents);
+
+    // Two-way sync: cancel any in-flight promote tap so we don't double-create.
+    const pendingTimer = pendingPromoteTimers.current[todoId];
+    if (pendingTimer) clearTimeout(pendingTimer);
+    delete pendingPromoteTimers.current[todoId];
+    if (todoId in pendingPromoteState) {
+      setPendingPromoteState(prev => {
+        const { [todoId]: _, ...rest } = prev;
+        return rest;
+      });
+    }
+
+    // Surface/sync a linked daily task for today (dedupe onto an existing one).
+    const existing = dailyTasks.find(t => t.linkedTodoId === todoId && t.date === todayStr);
+    if (existing) {
+      saveDailyTasks(dailyTasks.map(t => t.id === existing.id
+        ? { ...t, completed: nextCompleted, completedAt: nextCompleted ? ts : null, changes: [...(t.changes || []), ts] }
+        : t));
+    } else if (nextCompleted) {
+      saveDailyTasks([...dailyTasks, {
+        id: Math.random().toString(36).substr(2, 9),
+        text: todo.text,
+        completed: true,
+        date: todayStr,
+        linkedEventId: eventId,
+        linkedTodoId: todoId,
+        createdAt: ts,
+        completedAt: ts,
+        changes: [ts],
+      }]);
+    }
   };
 
   const handleNextActionChange = async (eventId: string, nextAction: string) => {
@@ -733,21 +910,59 @@ export default function EventList() {
     await saveEvents(updatedEvents);
   };
 
-  const handleStatusChange = async (eventId: string, status: 'active' | 'completed' | 'incomplete') => {
-    const ts = now();
-    const updatedEvents = events.map(ev => {
-      if (ev.id !== eventId) return ev;
-      return {
-        ...ev,
-        status,
-        completedAt: status === 'completed' ? ts : (status === 'active' ? null : ev.completedAt),
-      };
-    });
+  // Lock a recurring item's dates: provisional → confirmed (drops the "≈ guess" styling).
+  const handleConfirmDates = async (eventId: string) => {
+    const updatedEvents = events.map(ev =>
+      ev.id === eventId && ev.recurrence
+        ? { ...ev, recurrence: { ...ev.recurrence, dateStatus: 'confirmed' as const } }
+        : ev
+    );
     await saveEvents(updatedEvents);
   };
 
+  const handleStatusChange = async (eventId: string, status: 'active' | 'completed' | 'incomplete', note?: string) => {
+    const ts = now();
+    const spawned: EventItem[] = [];
+    const updatedEvents = events.map(ev => {
+      if (ev.id !== eventId) return ev;
+      // Re-arm: marking a recurring item done freezes this instance (untouched but for
+      // status/completedAt) and spawns next cycle's provisional instance from the template.
+      if (ev.recurrence && (status === 'completed' || status === 'incomplete')) {
+        const label = ev.recurrence.cycleLabel;
+        spawned.push({
+          ...ev,
+          id: Math.random().toString(36).substr(2, 9),
+          status: 'active',
+          dueDate: addYears(ev.dueDate, 1),
+          todos: [],
+          starred: false,
+          nextAction: undefined,
+          createdAt: ts,
+          completedAt: null,
+          closingNote: undefined,
+          gardenedAt: null,
+          recurrence: {
+            ...ev.recurrence,
+            openDate: addYears(ev.recurrence.openDate, 1),
+            dateStatus: 'provisional',
+            ...(label && /^\d{4}$/.test(label) ? { cycleLabel: String(Number(label) + 1) } : {}),
+          },
+        });
+      }
+      return {
+        ...ev,
+        status,
+        // Preserve completedAt when only the note is being edited on an already-completed item.
+        completedAt: status === 'completed' ? (ev.status === 'completed' ? ev.completedAt : ts) : (status === 'active' ? null : ev.completedAt),
+        // undefined note = leave the existing note untouched; empty string clears it.
+        closingNote: note !== undefined ? (note.trim() || undefined) : ev.closingNote,
+      };
+    });
+    await saveEvents([...updatedEvents, ...spawned]);
+  };
+
   const resetForm = () => {
-    setFormData({ name: "", dueDate: "", description: "", url: "", tags: [], todos: [], status: 'active', nextAction: "" });
+    setFormData({ name: "", dueDate: "", description: "", url: "", tags: [], todos: [], status: 'active', nextAction: "", isRecurring: false, openDate: "", leadDays: 14, eligibilityNote: "", dateStatus: 'provisional' });
     setIsAdding(false);
     setEditingId(null);
     setNewTodoText("");
@@ -757,14 +972,26 @@ export default function EventList() {
     e.preventDefault();
     if (!formData.name || !formData.dueDate) return;
 
-    const cleanedFormData = { ...formData, nextAction: formData.nextAction?.trim() || undefined };
+    // Peel the recurrence helper fields off formData and assemble the recurrence object.
+    const { isRecurring, openDate, leadDays, eligibilityNote, dateStatus, ...rest } = formData;
+    const cleanedFormData = { ...rest, nextAction: rest.nextAction?.trim() || undefined };
+    const recurrence: Recurrence | undefined = isRecurring
+      ? {
+          openDate: openDate || rest.dueDate,
+          leadDays: Number(leadDays) || 14,
+          dateStatus,
+          ...(eligibilityNote.trim() ? { eligibilityNote: eligibilityNote.trim() } : {}),
+        }
+      : undefined;
 
     let updatedEvents;
     if (editingId) {
-      updatedEvents = events.map(ev => ev.id === editingId ? { ...ev, ...cleanedFormData, id: editingId } : ev);
+      updatedEvents = events.map(ev => ev.id === editingId ? { ...ev, ...cleanedFormData, recurrence, id: editingId } : ev);
+      setExpandedIds(prev => prev.filter(i => i !== editingId));
     } else {
       const newEvent: EventItem = {
         ...cleanedFormData,
+        recurrence,
         id: Math.random().toString(36).substr(2, 9),
         status: 'active',
         createdAt: now(),
@@ -786,7 +1013,12 @@ export default function EventList() {
       tags: event.tags || [],
       todos: event.todos || [],
       status: event.status || 'active',
-      nextAction: event.nextAction || ""
+      nextAction: event.nextAction || "",
+      isRecurring: !!event.recurrence,
+      openDate: event.recurrence?.openDate || "",
+      leadDays: event.recurrence?.leadDays ?? 14,
+      eligibilityNote: event.recurrence?.eligibilityNote || "",
+      dateStatus: event.recurrence?.dateStatus || 'provisional',
     });
     setEditingId(event.id);
     setIsAdding(false);
@@ -808,8 +1040,18 @@ export default function EventList() {
     const later: EventItem[] = [];
     const longHorizon: EventItem[] = [];
     const overTheHorizon: EventItem[] = [];
+    const watching: EventItem[] = [];     // recurring, dormant (today < openDate − leadDays)
+    const openingSoon: EventItem[] = [];  // recurring, surfaced but still provisional — "check the date"
 
     active.forEach(ev => {
+      // Recurring items sleep into Watching until their window opens. Exception:
+      // recurrenceImminentOverride items have a near-term deadline (current cycle is live),
+      // so they fall through to normal dueDate grouping instead of being parked.
+      if (ev.recurrence && !recurrenceImminentOverride(ev)) {
+        if (TODAY.getTime() < recurrenceSurfaceTime(ev.recurrence)) { watching.push(ev); return; }
+        if (ev.recurrence.dateStatus === 'provisional') { openingSoon.push(ev); return; }
+        // confirmed recurring items fall through to normal dueDate horizon logic
+      }
       const diffTime = parseLocalDate(ev.dueDate).getTime() - TODAY.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       if (diffDays < 0) overTheHorizon.push(ev);
@@ -818,13 +1060,19 @@ export default function EventList() {
       else later.push(ev);
     });
 
-    return { thisWeek, later, longHorizon, overTheHorizon, archived };
+    watching.sort((a, b) => recurrenceSurfaceTime(a.recurrence!) - recurrenceSurfaceTime(b.recurrence!));
+    openingSoon.sort((a, b) => parseLocalDate(a.recurrence!.openDate).getTime() - parseLocalDate(b.recurrence!.openDate).getTime());
+
+    return { thisWeek, later, longHorizon, overTheHorizon, watching, openingSoon, archived };
   }, [filteredEvents]);
 
   // --- Gardening session ---
   const gardenEvents = useMemo(() => {
     return events
       .filter(ev => (ev.status || 'active') === 'active')
+      // Skip dormant recurring items — they're intentionally parked until their window opens.
+      // (Imminent-deadline overrides are a live current cycle, so they stay gardenable.)
+      .filter(ev => !ev.recurrence || recurrenceImminentOverride(ev) || TODAY.getTime() >= recurrenceSurfaceTime(ev.recurrence))
       .sort((a, b) => parseLocalDate(a.dueDate).getTime() - parseLocalDate(b.dueDate).getTime());
   }, [events]);
 
@@ -1256,6 +1504,33 @@ export default function EventList() {
             <div className={styles.formHeader}>{editingId ? "Edit Horizon" : "New Horizon"}</div>
             <input type="text" placeholder="Horizon Name" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className={styles.input} required />
             <input type="date" value={formData.dueDate} onChange={(e) => setFormData({...formData, dueDate: e.target.value})} className={styles.input} required />
+
+            <label className={styles.recurrenceToggle}>
+              <input
+                type="checkbox"
+                checked={formData.isRecurring}
+                onChange={(e) => setFormData({
+                  ...formData,
+                  isRecurring: e.target.checked,
+                  openDate: e.target.checked && !formData.openDate ? formData.dueDate : formData.openDate,
+                })}
+              />
+              Recurring opportunity
+            </label>
+            {formData.isRecurring && (
+              <div className={styles.recurrenceFields}>
+                <label className={styles.recurrenceLabel}>Opens (deadline above is the due date)</label>
+                <input type="date" value={formData.openDate} onChange={(e) => setFormData({...formData, openDate: e.target.value})} className={styles.input} />
+                <label className={styles.recurrenceLabel}>Surface this many days before it opens</label>
+                <input type="number" min={0} value={formData.leadDays} onChange={(e) => setFormData({...formData, leadDays: Number(e.target.value)})} className={styles.input} />
+                <input type="text" placeholder="Eligibility note (optional)" value={formData.eligibilityNote} onChange={(e) => setFormData({...formData, eligibilityNote: e.target.value})} className={styles.input} />
+                <div className={styles.tagSelector}>
+                  <button type="button" className={`${styles.tagButton} ${formData.dateStatus === 'provisional' ? styles.tagActive : ""}`} onClick={() => setFormData({...formData, dateStatus: 'provisional'})}>provisional (guess)</button>
+                  <button type="button" className={`${styles.tagButton} ${formData.dateStatus === 'confirmed' ? styles.tagActive : ""}`} onClick={() => setFormData({...formData, dateStatus: 'confirmed'})}>confirmed</button>
+                </div>
+              </div>
+            )}
+
             <input type="url" placeholder="Website (optional)" value={formData.url} onChange={(e) => setFormData({...formData, url: e.target.value})} className={styles.input} />
             <input type="text" placeholder="Next action… e.g. Send PDF to PurePrint" value={formData.nextAction} onChange={(e) => setFormData({...formData, nextAction: e.target.value})} className={styles.input} />
             <textarea ref={formDescRef} placeholder="Description" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} onInput={(e) => fitTextarea(e.currentTarget)} className={styles.textarea} />
@@ -1820,14 +2095,37 @@ export default function EventList() {
       <div className={styles.list}>
         {currentTab === 'ongoing' && (
           <>
-            {renderSection("Over The Horizon", groupedEvents.overTheHorizon, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions)}
-            {renderSection("Short Horizon", groupedEvents.thisWeek, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions)}
-            {!minimized && renderSection("Horizon", groupedEvents.later, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions)}
-            {!minimized && renderSection("Long Horizon", groupedEvents.longHorizon, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions)}
+            {renderSection("Opening soon", groupedEvents.openingSoon, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective)}
+            {renderSection("Over The Horizon", groupedEvents.overTheHorizon, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective)}
+            {renderSection("Short Horizon", groupedEvents.thisWeek, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective)}
+            {groupedEvents.later.length > 0 && (
+              <div className={styles.section}>
+                <h3 className={styles.foldHeader} onClick={() => { minimizedLockedRef.current = !minimizedLockedRef.current; setMinimized(minimizedLockedRef.current); }}>
+                  {minimized ? '▸' : '▾'} Horizon ({groupedEvents.later.length})
+                </h3>
+                {!minimized && renderSection("", groupedEvents.later, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective)}
+              </div>
+            )}
+            {groupedEvents.longHorizon.length > 0 && (
+              <div className={styles.section}>
+                <h3 className={styles.foldHeader} onClick={() => setShowLongHorizon(v => !v)}>
+                  {showLongHorizon ? '▾' : '▸'} Long Horizon ({groupedEvents.longHorizon.length})
+                </h3>
+                {showLongHorizon && renderSection("", groupedEvents.longHorizon, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective)}
+              </div>
+            )}
+            {groupedEvents.watching.length > 0 && (
+              <div className={styles.section}>
+                <h3 className={styles.foldHeader} onClick={() => setShowWatching(v => !v)}>
+                  {showWatching ? '▾' : '▸'} Watching ({groupedEvents.watching.length})
+                </h3>
+                {showWatching && renderSection("", groupedEvents.watching, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective)}
+              </div>
+            )}
           </>
         )}
         {currentTab === 'archive' && (
-          renderSection("Over The Horizon", groupedEvents.archived, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions)
+          renderSection("Over The Horizon", groupedEvents.archived, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective)
         )}
         {activeFilters.length > 0 && filteredEvents.length === 0 && <div className={styles.empty}>No matching horizons</div>}
       </div>
@@ -1890,21 +2188,32 @@ function renderSection(
   onToggle: (id: string) => void,
   onEdit: (e: React.MouseEvent, ev: EventItem) => void,
   onToggleTodo: (eventId: string, todoId: string) => void,
-  onStatusChange: (eventId: string, status: 'active' | 'completed' | 'incomplete') => void,
+  onStatusChange: (eventId: string, status: 'active' | 'completed' | 'incomplete', note?: string) => void,
   onNextActionChange: (eventId: string, nextAction: string) => void,
   onDelete: (eventId: string) => void,
   onStarToggle: (eventId: string) => void,
-  showNextActions: boolean = false
+  showNextActions: boolean = false,
+  onConfirmDates: (eventId: string) => void = () => {},
+  onPromoteTodo: (eventId: string, todo: TodoItem) => void = () => {},
+  isTodoPromoted: (todoId: string) => boolean = () => false
 ) {
   if (items.length === 0) return null;
   return (
     <div className={styles.section}>
-      <h3 className={`${styles.sectionTitle} ${title === "Over The Horizon" ? styles.sectionTitleBlue : ""}`}>{title}</h3>
+      {title && <h3 className={`${styles.sectionTitle} ${title === "Over The Horizon" ? styles.sectionTitleBlue : ""}`}>{title}</h3>}
       {items.map((event) => {
         const { daysText, weekday } = getDaysData(event.dueDate);
         const isArchived = (event.status || 'active') !== 'active';
         const isExpanded = expandedIds.includes(event.id);
         const isOTH = title === "Over The Horizon";
+        // Recurrence display: provisional recurring items get the "≈ guess" treatment;
+        // dormant ones show when they'll wake, surfaced ones prompt "check the date".
+        const rec = event.recurrence;
+        // Imminent-deadline override: a recurring item surfaced early because its due date is
+        // near — render it as an ordinary active item (no ≈ provisional / dormant treatment).
+        const liveDeadline = rec ? recurrenceImminentOverride(event) : false;
+        const isProvisional = rec?.dateStatus === 'provisional' && !liveDeadline;
+        const isDormant = rec && !liveDeadline ? TODAY.getTime() < recurrenceSurfaceTime(rec) : false;
         const gardenAgeDays = event.gardenedAt
           ? Math.floor((Date.now() - new Date(event.gardenedAt).getTime()) / 86400000)
           : null;
@@ -1949,9 +2258,17 @@ function renderSection(
                       </div>
                     );
                   })()}
+                  {rec && isProvisional && (
+                    <div className={styles.recurrenceHint}>
+                      {isDormant
+                        ? `≈ wakes ${formatDate(getDateStrFromTime(recurrenceSurfaceTime(rec)))}`
+                        : `≈ opens ${formatDate(rec.openDate)} — check the date`}
+                      {rec.eligibilityNote ? ` · ${rec.eligibilityNote}` : ""}
+                    </div>
+                  )}
                 </div>
-                <div className={styles.dateGroup}>
-                  <span className={styles.daysUntil}>{daysText}</span>
+                <div className={`${styles.dateGroup} ${isProvisional ? styles.provisionalDate : ""}`}>
+                  <span className={styles.daysUntil}>{isProvisional ? `≈ ${daysText}` : daysText}</span>
                   <span className={styles.weekdayLabel}>{weekday}</span>
                 </div>
               </div>
@@ -1960,7 +2277,10 @@ function renderSection(
               {isExpanded && (
                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className={styles.descriptionWrapper}>
                   <div className={styles.description}>
-                    <div className={styles.detailsRow}><Calendar size={18} /> <span>Due: {formatDate(event.dueDate)}</span></div>
+                    <div className={styles.detailsRow}><Calendar size={18} /> <span>Due: {formatDate(event.dueDate)}{rec && isProvisional ? " (provisional)" : ""}</span></div>
+                    {rec && (
+                      <div className={styles.detailsRow}><Calendar size={18} /> <span>{isProvisional ? "≈ " : ""}Opens: {formatDate(rec.openDate)} · surfaces {rec.leadDays}d before</span></div>
+                    )}
                     {event.url && (
                       <div className={styles.detailsRow}>
                         <Globe size={18} />
@@ -1973,8 +2293,19 @@ function renderSection(
                       <div className={styles.todoListDisplay}>
                         <div className={styles.todoListTitle}>Tasks</div>
                         {(event.todos || []).map(todo => (
-                          <div key={todo.id} className={styles.todoItem} onClick={() => onToggleTodo(event.id, todo.id)}>
-                            <input type="checkbox" checked={todo.completed} readOnly className={styles.checkbox} />
+                          <div
+                            key={todo.id}
+                            className={`${styles.todoItem} ${isTodoPromoted(todo.id) ? styles.todoPromoted : ""}`}
+                            onClick={() => onPromoteTodo(event.id, todo)}
+                            title="Tap to send to today's tasks"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={todo.completed}
+                              onClick={(e) => { e.stopPropagation(); onToggleTodo(event.id, todo.id); }}
+                              onChange={() => {}}
+                              className={styles.checkbox}
+                            />
                             <span className={todo.completed ? styles.completedTodo : ""}>{todo.text}</span>
                           </div>
                         ))}
@@ -1990,10 +2321,13 @@ function renderSection(
                     <div className={styles.archiveActions}>
                       <button className={styles.editBtn} onClick={(e) => onEdit(e, event)}><Edit2 size={16} /> Edit</button>
                       <button className={styles.editBtn} onClick={() => onStarToggle(event.id)}>{event.starred ? '★ Unstar' : '☆ Star'}</button>
+                      {!isArchived && rec && isProvisional && (
+                        <button onClick={() => onConfirmDates(event.id)} className={styles.completeBtn}>Confirm dates</button>
+                      )}
                       {!isArchived ? (
                         <>
-                          <button onClick={() => onStatusChange(event.id, 'completed')} className={styles.completeBtn}>Mark Complete</button>
-                          <button onClick={() => onStatusChange(event.id, 'incomplete')} className={styles.incompleteBtn}>Mark Incomplete</button>
+                          <button onClick={() => { const note = window.prompt('Closing note (optional):', event.closingNote || ''); onStatusChange(event.id, 'completed', note ?? undefined); }} className={styles.completeBtn}>Mark Complete</button>
+                          <button onClick={() => { const note = window.prompt('Closing note (optional):', event.closingNote || ''); onStatusChange(event.id, 'incomplete', note ?? undefined); }} className={styles.incompleteBtn}>Mark Incomplete</button>
                         </>
                       ) : (
                         <button onClick={() => onStatusChange(event.id, 'active')} className={styles.completeBtn}>Re-activate</button>
@@ -2003,6 +2337,14 @@ function renderSection(
                     {isArchived && (
                       <div className={`${styles.statusBadge} ${styles[event.status || 'active']}`}>
                         Status: {event.status}
+                      </div>
+                    )}
+                    {isArchived && (
+                      <div
+                        className={styles.closingNote}
+                        onClick={() => { const note = window.prompt('Closing note (optional):', event.closingNote || ''); if (note !== null) onStatusChange(event.id, event.status as 'completed' | 'incomplete', note); }}
+                      >
+                        {event.closingNote || <span className={styles.closingNotePlaceholder}>+ add note</span>}
                       </div>
                     )}
                   </div>

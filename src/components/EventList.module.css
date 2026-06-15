@@ -268,6 +268,55 @@
   line-height: 1.1;
 }
 
+/* Provisional (guessed) recurrence dates: dimmed + italic so a guess never reads as fact */
+.provisionalDate {
+  opacity: 0.55;
+  font-style: italic;
+}
+
+.recurrenceHint {
+  font-size: 1rem;
+  font-style: italic;
+  color: var(--text-secondary);
+  line-height: 1.3;
+  margin-top: 2px;
+}
+
+/* Collapsible group header (Long Horizon, Watching) — folded but visible, shows a count */
+.foldHeader {
+  font-size: 1.15rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+  padding: 0.667rem 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Recurrence fields revealed by the "Recurring opportunity" toggle in the form */
+.recurrenceToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.15rem;
+  color: var(--foreground);
+  cursor: pointer;
+  user-select: none;
+  margin: 0.25rem 0;
+}
+
+.recurrenceFields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem 0 0.5rem 1.5rem;
+  border-left: 2px solid var(--text-secondary);
+}
+
+.recurrenceLabel {
+  font-size: 1rem;
+  color: var(--text-secondary);
+}
+
 .editBtn {
   background: none;
   border: none;
@@ -341,6 +390,16 @@
   color: var(--text-secondary);
 }
 
+/* Subtask currently surfaced on today's scratchpad — subtle trailing marker. */
+.todoPromoted::after {
+  content: "• today";
+  margin-left: 0.5rem;
+  font-size: 0.7em;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  opacity: 0.75;
+}
+
 .itemTags {
   display: flex;
   flex-wrap: wrap;
@@ -400,6 +459,20 @@
 
 .completed { color: var(--tag-grants); }
 .incomplete { color: var(--tag-competitions); }
+
+.closingNote {
+  margin-top: 0.5rem;
+  font-size: 1.15rem;
+  font-style: italic;
+  cursor: pointer;
+  color: var(--foreground);
+  opacity: 0.85;
+}
+
+.closingNotePlaceholder {
+  font-style: normal;
+  opacity: 0.45;
+}
 
 /* Form Styling */
 .addForm {

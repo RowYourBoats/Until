@@ -144,5 +144,65 @@
     "createdAt": "2026-02-01T09:00:00.000Z",
     "completedAt": "2026-03-25T14:00:00.000Z",
     "gardenedAt": null
+  },
+  {
+    "id": "ev_rec_prixars",
+    "name": "Prix Ars Electronica",
+    "dueDate": "2026-08-15",
+    "description": "Annual media-art competition. Last cycle opened mid-June, closed mid-August. Re-entered from last year's dates as a guess — verify on the site before relying on them.",
+    "url": "https://ars.electronica.art/prix/",
+    "tags": ["competitions", "funded", "video"],
+    "todos": [],
+    "status": "active",
+    "createdAt": "2025-08-20T09:00:00.000Z",
+    "completedAt": null,
+    "gardenedAt": null,
+    "recurrence": {
+      "openDate": "2026-06-20",
+      "leadDays": 14,
+      "dateStatus": "provisional",
+      "eligibilityNote": "Computer Animation / New Animation Art category",
+      "cycleLabel": "2026"
+    }
+  },
+  {
+    "id": "ev_rec_jerome",
+    "name": "Jerome Hill Artist Fellowship",
+    "dueDate": "2026-09-30",
+    "description": "Recurring fellowship for early-career artists. Long runway — surfaces well ahead so the portfolio can be prepped. Dates are last year's guess until confirmed.",
+    "url": "https://jeromefdn.org/",
+    "tags": ["fellowship", "funded", "portfolio", "cv"],
+    "todos": [],
+    "status": "active",
+    "createdAt": "2025-09-15T09:00:00.000Z",
+    "completedAt": null,
+    "gardenedAt": null,
+    "recurrence": {
+      "openDate": "2026-07-01",
+      "leadDays": 45,
+      "dateStatus": "provisional",
+      "eligibilityNote": "Minnesota residency requirement — check eligibility",
+      "cycleLabel": "2026"
+    }
+  },
+  {
+    "id": "ev_rec_banff",
+    "name": "Banff Centre Winter Residency",
+    "dueDate": "2027-01-20",
+    "description": "Dormant until autumn — opens in October for the winter cohort. Sits in Watching until its lead window. Provisional dates carried from last cycle.",
+    "url": "https://banffcentre.ca/",
+    "tags": ["residencies", "funded", "portfolio"],
+    "todos": [],
+    "status": "active",
+    "createdAt": "2025-10-10T09:00:00.000Z",
+    "completedAt": null,
+    "gardenedAt": null,
+    "recurrence": {
+      "openDate": "2026-10-15",
+      "leadDays": 30,
+      "dateStatus": "provisional",
+      "eligibilityNote": "Self-directed residency stream",
+      "cycleLabel": "2026"
+    }
   }
 ]
