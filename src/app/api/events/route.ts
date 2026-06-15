@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
-import { writeJsonAtomic } from "@/lib/atomicWrite";
+import { writeJsonAtomic, PERSIST_DISABLED } from "@/lib/atomicWrite";
 
 const filePath = path.join(process.cwd(), "data", "events.json");
 const examplePath = path.join(process.cwd(), "data-example", "events.json");
@@ -69,11 +69,18 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await ensureDirs();
     const body = await request.json();
     const isWrapped = body && !Array.isArray(body) && body.events;
     const newEvents = isWrapped ? body.events : body;
     const deletedEvents = isWrapped ? (body.deleted || []) : [];
+
+    // Read-only demo (Vercel): skip all filesystem work and ack so the client
+    // keeps its in-session state instead of surfacing a 500.
+    if (PERSIST_DISABLED) {
+      return NextResponse.json({ success: true, persisted: false });
+    }
+
+    await ensureDirs();
 
     let oldEvents = [];
     try {
