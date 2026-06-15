@@ -1,5 +1,7 @@
 # Usage
 
+> Feature reference. For a narrative walkthrough of each surface and the reasoning behind each ritual, see [`flows.md`](./flows.md).
+
 ## Getting Started
 
 ```bash

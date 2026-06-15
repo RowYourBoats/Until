@@ -34,4 +34,5 @@ The Vercel deployment is read-only at runtime — it serves the bundled snapshot
 
 ## Usage
 
-See [`usage.md`](./usage.md) for a feature-by-feature walkthrough — tabs, shortcuts, the Repeating undo window, gardening, pomodoro outcomes, and the bottom-bar buttons.
+- [`flows.md`](./flows.md) — a narrative walkthrough of each surface (Horizons, Repeating, Daily Tasks, Pomodoro, Gardening, Force Majeure, bottom-bar shortcuts, peek/lock modifiers). Start here for what Until actually feels like to use, and why each part is shaped the way it is.
+- [`usage.md`](./usage.md) — feature-by-feature reference. Use this when you know what you're looking for.
