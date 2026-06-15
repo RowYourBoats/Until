@@ -7,10 +7,9 @@ out/
 
 # Personal data
 data/*.json
-projects/active/*
-projects/completed/*
-projects/incomplete/*
-projects/trash/*
+data/*.tmp
+projects/*
+!projects/.gitkeep
 !**/.gitkeep
 
 # TypeScript build info

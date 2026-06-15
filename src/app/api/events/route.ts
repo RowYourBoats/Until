@@ -1,18 +1,20 @@
 import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
+import { writeJsonAtomic } from "@/lib/atomicWrite";
 
 const filePath = path.join(process.cwd(), "data", "events.json");
 const examplePath = path.join(process.cwd(), "data-example", "events.json");
 const projectsRoot = path.join(process.cwd(), "projects");
 
 async function ensureDirs() {
+  // Active projects live directly in the root; archive states get _-prefixed dirs
+  // so they sort out of the way in a file explorer / Google Drive.
   const dirs = [
     projectsRoot,
-    path.join(projectsRoot, "active"),
-    path.join(projectsRoot, "completed"),
-    path.join(projectsRoot, "incomplete"),
-    path.join(projectsRoot, "trash"),
+    path.join(projectsRoot, "_complete"),
+    path.join(projectsRoot, "_incomplete"),
+    path.join(projectsRoot, "_trash"),
   ];
   for (const dir of dirs) {
     try {
@@ -23,8 +25,25 @@ async function ensureDirs() {
   }
 }
 
+// Maps an event status to its containing directory. Active = root.
+function statusDir(status: string | undefined) {
+  switch (status) {
+    case "completed":
+      return path.join(projectsRoot, "_complete");
+    case "incomplete":
+      return path.join(projectsRoot, "_incomplete");
+    default:
+      return projectsRoot;
+  }
+}
+
 function sanitizeFolderName(name: string) {
-  return name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  // Strip leading underscores so an active project folder can never collide
+  // with a reserved archive dir (_complete / _incomplete / _trash).
+  return name
+    .replace(/[^a-z0-9]/gi, '_')
+    .toLowerCase()
+    .replace(/^_+/, '');
 }
 
 function getFolderName(event: any) {
@@ -68,8 +87,8 @@ export async function POST(request: Request) {
       const folderName = getFolderName(newEvent);
       
       if (!oldEvent) {
-        // New event - create folder in active
-        const activePath = path.join(projectsRoot, "active", folderName);
+        // New event - create folder for its status (active lands in the root)
+        const activePath = path.join(statusDir(newEvent.status), folderName);
         try {
           await fs.mkdir(activePath, { recursive: true });
         } catch (e) {
@@ -77,11 +96,9 @@ export async function POST(request: Request) {
         }
       } else if (oldEvent.status !== newEvent.status || oldEvent.dueDate !== newEvent.dueDate || oldEvent.name !== newEvent.name) {
         // Status, date, or name changed - potentially move/rename folder
-        const oldStatus = oldEvent.status || 'active';
-        const newStatus = newEvent.status || 'active';
         const oldFolderName = getFolderName(oldEvent);
-        const oldPath = path.join(projectsRoot, oldStatus, oldFolderName);
-        const newPath = path.join(projectsRoot, newStatus, folderName);
+        const oldPath = path.join(statusDir(oldEvent.status), oldFolderName);
+        const newPath = path.join(statusDir(newEvent.status), folderName);
         
         if (oldPath !== newPath) {
           try {
@@ -100,10 +117,9 @@ export async function POST(request: Request) {
 
     // Handle deleted events - move folders to trash
     for (const deleted of deletedEvents) {
-      const status = deleted.status || 'active';
       const folderName = getFolderName(deleted);
-      const oldPath = path.join(projectsRoot, status, folderName);
-      const trashPath = path.join(projectsRoot, "trash", folderName);
+      const oldPath = path.join(statusDir(deleted.status), folderName);
+      const trashPath = path.join(projectsRoot, "_trash", folderName);
       try {
         await fs.access(oldPath);
         await fs.rename(oldPath, trashPath);
@@ -112,7 +128,7 @@ export async function POST(request: Request) {
       }
     }
 
-    await fs.writeFile(filePath, JSON.stringify(newEvents, null, 2), "utf8");
+    await writeJsonAtomic(filePath, newEvents);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("API Error:", error);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
+import { writeJsonAtomic } from "@/lib/atomicWrite";
 
 const filePath = path.join(process.cwd(), "data", "rhei.json");
 const examplePath = path.join(process.cwd(), "data-example", "rhei.json");
@@ -22,7 +23,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const items = await request.json();
-    await fs.writeFile(filePath, JSON.stringify(items, null, 2), "utf8");
+    await writeJsonAtomic(filePath, items);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Rhei API error:", error);

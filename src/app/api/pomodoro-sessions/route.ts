@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
+import { writeJsonAtomic } from "@/lib/atomicWrite";
 
 const filePath = path.join(process.cwd(), "data", "pomodoro-sessions.json");
 const examplePath = path.join(process.cwd(), "data-example", "pomodoro-sessions.json");
@@ -22,7 +23,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const sessions = await request.json();
-    await fs.writeFile(filePath, JSON.stringify(sessions, null, 2), "utf8");
+    await writeJsonAtomic(filePath, sessions);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Pomodoro sessions API error:", error);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
+import { writeJsonAtomic } from "@/lib/atomicWrite";
 
 const filePath = path.join(process.cwd(), "data", "daily-tasks.json");
 const examplePath = path.join(process.cwd(), "data-example", "daily-tasks.json");
@@ -22,7 +23,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const tasks = await request.json();
-    await fs.writeFile(filePath, JSON.stringify(tasks, null, 2), "utf8");
+    await writeJsonAtomic(filePath, tasks);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Daily tasks API error:", error);
