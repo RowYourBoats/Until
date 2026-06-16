@@ -1,208 +1,70 @@
 [
   {
-    "id": "ev_drift",
-    "name": "Solo Show: Drift",
-    "dueDate": "2027-02-01",
-    "description": "First solo show concept — six interactive video installations exploring slow algorithmic drift through generative landscapes. Looking at venues with capacity for low-light room-scale projection. Needs portfolio, artist statement, technical specs, budget.",
-    "url": "",
-    "tags": ["exhibitions", "proposal", "text", "images"],
+    "id": "ev_welcome",
+    "name": "Make this your own",
+    "dueDate": "2026-07-07",
+    "description": "A live demo — add your own projects, tasks, and habits. Nothing you do here is saved (the demo is read-only), so poke around freely. Tap a task below to send it to today's scratchpad.",
+    "tags": ["admin"],
     "todos": [
-      { "id": "td_drift_1", "text": "Outline artist statement", "completed": false, "createdAt": "2026-04-28T15:00:00.000Z", "completedAt": null },
-      { "id": "td_drift_2", "text": "Renders for proposal PDF", "completed": false, "createdAt": "2026-04-28T15:00:00.000Z", "completedAt": null },
-      { "id": "td_drift_3", "text": "Reach out to Phi Centre", "completed": false, "createdAt": "2026-04-28T15:00:00.000Z", "completedAt": null },
-      { "id": "td_drift_4", "text": "Confirm room dimensions", "completed": true, "createdAt": "2026-04-15T10:00:00.000Z", "completedAt": "2026-04-22T18:00:00.000Z" }
+      { "id": "td_w_add", "text": "Add your own project", "completed": false, "createdAt": "2026-06-14T09:00:00.000Z", "completedAt": null },
+      { "id": "td_w_today", "text": "Send a task to today", "completed": false, "createdAt": "2026-06-14T09:00:00.000Z", "completedAt": null },
+      { "id": "td_w_note", "text": "Mark something complete with a note", "completed": false, "createdAt": "2026-06-14T09:00:00.000Z", "completedAt": null },
+      { "id": "td_w_focus", "text": "Run a 25-minute focus timer", "completed": true, "createdAt": "2026-06-14T09:00:00.000Z", "completedAt": "2026-06-16T15:25:00.000Z" }
     ],
     "status": "active",
-    "nextAction": "Outline artist statement",
-    "createdAt": "2026-04-15T09:00:00.000Z",
+    "createdAt": "2026-06-14T09:00:00.000Z",
     "completedAt": null,
-    "gardenedAt": "2026-05-02T19:00:00.000Z",
-    "starred": true
+    "gardenedAt": "2026-06-15T10:00:00.000Z"
   },
   {
-    "id": "ev_skill",
-    "name": "Claude Agent Skill Submission",
-    "dueDate": "2026-05-20",
-    "description": "Building a Claude Code skill for translating Figma component nodes into TouchDesigner network snippets. Submit to Anthropic's skills directory. Need clean prompt template, example payloads, README, and a short demo video.",
-    "url": "https://docs.anthropic.com/claude/docs/skills",
-    "tags": ["code", "text", "video"],
-    "todos": [
-      { "id": "td_skill_1", "text": "Polish skill prompt", "completed": false, "createdAt": "2026-04-30T14:00:00.000Z", "completedAt": null },
-      { "id": "td_skill_2", "text": "Record 90s demo video", "completed": false, "createdAt": "2026-04-30T14:00:00.000Z", "completedAt": null },
-      { "id": "td_skill_3", "text": "Write submission README", "completed": false, "createdAt": "2026-04-30T14:00:00.000Z", "completedAt": null }
-    ],
-    "status": "active",
-    "createdAt": "2026-04-30T13:00:00.000Z",
-    "completedAt": null,
-    "gardenedAt": null
-  },
-  {
-    "id": "ev_td",
-    "name": "TouchDesigner Summit Workshop",
-    "dueDate": "2026-05-15",
-    "description": "Workshop pitch for the TD Summit in Berlin — three-hour intensive on shader-driven generative environments. Requires speaker bio, CV, abstract, sample work links.",
-    "url": "https://derivative.ca/community-post/td-summit-2026",
-    "tags": ["conference", "video", "cv", "proposal"],
-    "todos": [
-      { "id": "td_td_1", "text": "Email mentor for letter", "completed": true, "createdAt": "2026-04-25T11:00:00.000Z", "completedAt": "2026-05-04T08:00:00.000Z" },
-      { "id": "td_td_2", "text": "Draft 250-word abstract", "completed": false, "createdAt": "2026-04-25T11:00:00.000Z", "completedAt": null },
-      { "id": "td_td_3", "text": "Update CV", "completed": false, "createdAt": "2026-04-25T11:00:00.000Z", "completedAt": null }
-    ],
-    "status": "active",
-    "createdAt": "2026-04-25T11:00:00.000Z",
-    "completedAt": null,
-    "gardenedAt": null
-  },
-  {
-    "id": "ev_video",
-    "name": "Code Connect Tutorial",
-    "dueDate": "2026-05-10",
-    "description": "Short tutorial video on Figma Code Connect → React Native handoff. For the studio newsletter. ~6 minutes, screen recording with voiceover.",
-    "url": "",
-    "tags": ["video", "text", "code"],
-    "todos": [
-      { "id": "td_video_1", "text": "Script outline", "completed": true, "createdAt": "2026-04-26T16:00:00.000Z", "completedAt": "2026-04-29T10:00:00.000Z" },
-      { "id": "td_video_2", "text": "Screen capture pass", "completed": false, "createdAt": "2026-04-26T16:00:00.000Z", "completedAt": null },
-      { "id": "td_video_3", "text": "Voiceover", "completed": false, "createdAt": "2026-04-26T16:00:00.000Z", "completedAt": null }
-    ],
-    "status": "active",
-    "nextAction": "Screen capture pass",
-    "createdAt": "2026-04-26T16:00:00.000Z",
-    "completedAt": null,
-    "gardenedAt": "2026-04-30T20:00:00.000Z"
-  },
-  {
-    "id": "ev_genfest",
-    "name": "Generative Art Festival — Open Call",
-    "dueDate": "2026-08-01",
-    "description": "Annual juried festival in Lisbon. Open call for screen-based or installation works under 8 minutes. Selected works receive a €1500 honorarium and travel.",
-    "url": "https://genartfest.example/open-call-2026",
-    "tags": ["competitions", "funded", "video", "code"],
-    "todos": [
-      { "id": "td_gen_1", "text": "Pick three candidate works", "completed": false, "createdAt": "2026-04-20T12:00:00.000Z", "completedAt": null },
-      { "id": "td_gen_2", "text": "Bilingual statement (EN/PT)", "completed": false, "createdAt": "2026-04-20T12:00:00.000Z", "completedAt": null }
-    ],
-    "status": "active",
-    "createdAt": "2026-04-20T12:00:00.000Z",
-    "completedAt": null,
-    "gardenedAt": "2026-04-29T14:00:00.000Z"
-  },
-  {
-    "id": "ev_unreal",
-    "name": "Unreal Plugin: Generative Worlds",
-    "dueDate": "2026-09-15",
-    "description": "Open-source plugin exposing a node-based interface for procedural landscape generation in Unreal 5.4. Long-tail project. Goal: alpha by mid-September, paper writeup for SIGGRAPH next year.",
-    "url": "https://github.com/example/unreal-genworlds",
-    "tags": ["code", "portfolio"],
-    "todos": [
-      { "id": "td_unreal_1", "text": "Fix terrain seed bug", "completed": false, "createdAt": "2026-04-08T09:00:00.000Z", "completedAt": null },
-      { "id": "td_unreal_2", "text": "Add HISM batching", "completed": false, "createdAt": "2026-04-08T09:00:00.000Z", "completedAt": null },
-      { "id": "td_unreal_3", "text": "Initial repo scaffold", "completed": true, "createdAt": "2026-04-01T10:00:00.000Z", "completedAt": "2026-04-08T09:00:00.000Z" }
-    ],
-    "status": "active",
-    "createdAt": "2026-04-01T10:00:00.000Z",
-    "completedAt": null,
-    "gardenedAt": "2026-04-12T18:00:00.000Z"
-  },
-  {
-    "id": "ev_grant",
-    "name": "Interactive Installation Grant — Year One",
-    "dueDate": "2026-04-15",
-    "description": "Provincial grant application for an outdoor projection mapping piece. Originally targeted spring deadline; missed it. Need to decide whether to push for the autumn round or drop entirely.",
-    "url": "",
-    "tags": ["grants", "funded", "proposal"],
-    "todos": [
-      { "id": "td_grant_1", "text": "Decide: re-submit autumn or kill", "completed": false, "createdAt": "2026-03-20T09:00:00.000Z", "completedAt": null }
-    ],
-    "status": "active",
-    "createdAt": "2026-03-20T09:00:00.000Z",
-    "completedAt": null,
-    "gardenedAt": null
-  },
-  {
-    "id": "ev_oldfest",
-    "name": "Festival Beyond Innovation",
-    "dueDate": "2026-04-01",
-    "description": "Past-due. Submitted in March; awaiting decision. Notes from organizer suggest end-of-May reply.",
-    "url": "",
-    "tags": ["competitions", "video"],
-    "todos": [],
-    "status": "active",
-    "createdAt": "2026-02-15T11:00:00.000Z",
-    "completedAt": null,
-    "gardenedAt": "2026-04-05T19:00:00.000Z"
-  },
-  {
-    "id": "ev_archived_residency",
-    "name": "Pier 9 Residency Application",
-    "dueDate": "2026-03-10",
-    "description": "Applied; declined. Move on.",
-    "url": "",
-    "tags": ["residencies", "portfolio", "cv"],
-    "todos": [],
-    "status": "incomplete",
-    "createdAt": "2026-02-01T09:00:00.000Z",
-    "completedAt": "2026-03-25T14:00:00.000Z",
-    "gardenedAt": null
-  },
-  {
-    "id": "ev_rec_prixars",
-    "name": "Prix Ars Electronica",
+    "id": "ev_data",
+    "name": "Own your data",
     "dueDate": "2026-08-15",
-    "description": "Annual media-art competition. Last cycle opened mid-June, closed mid-August. Re-entered from last year's dates as a guess — verify on the site before relying on them.",
-    "url": "https://ars.electronica.art/prix/",
-    "tags": ["competitions", "funded", "video"],
-    "todos": [],
+    "description": "Until keeps everything in plain JSON files you control — no account, no lock-in. Run it locally, back it up, or pipe it into your own tools.",
+    "url": "https://github.com/RowYourBoats/Until",
+    "tags": ["admin", "code"],
+    "todos": [
+      { "id": "td_d_flows", "text": "Read flows.md", "completed": true, "createdAt": "2026-06-12T09:00:00.000Z", "completedAt": "2026-06-15T11:00:00.000Z" },
+      { "id": "td_d_export", "text": "Export your data", "completed": false, "createdAt": "2026-06-12T09:00:00.000Z", "completedAt": null },
+      { "id": "td_d_local", "text": "Run Until locally", "completed": false, "createdAt": "2026-06-12T09:00:00.000Z", "completedAt": null }
+    ],
     "status": "active",
-    "createdAt": "2025-08-20T09:00:00.000Z",
+    "createdAt": "2026-06-12T09:00:00.000Z",
     "completedAt": null,
-    "gardenedAt": null,
-    "recurrence": {
-      "openDate": "2026-06-20",
-      "leadDays": 14,
-      "dateStatus": "provisional",
-      "eligibilityNote": "Computer Animation / New Animation Art category",
-      "cycleLabel": "2026"
-    }
+    "gardenedAt": null
   },
   {
-    "id": "ev_rec_jerome",
-    "name": "Jerome Hill Artist Fellowship",
-    "dueDate": "2026-09-30",
-    "description": "Recurring fellowship for early-career artists. Long runway — surfaces well ahead so the portfolio can be prepped. Dates are last year's guess until confirmed.",
-    "url": "https://jeromefdn.org/",
-    "tags": ["fellowship", "funded", "portfolio", "cv"],
+    "id": "ev_renew",
+    "name": "Renew domain & hosting",
+    "dueDate": "2027-01-15",
+    "description": "A recurring item. It sleeps in Watching until its window opens, then surfaces on its own — no need to keep it in your face year-round.",
+    "tags": ["admin", "funded"],
     "todos": [],
     "status": "active",
-    "createdAt": "2025-09-15T09:00:00.000Z",
+    "createdAt": "2026-06-10T09:00:00.000Z",
     "completedAt": null,
     "gardenedAt": null,
     "recurrence": {
-      "openDate": "2026-07-01",
-      "leadDays": 45,
-      "dateStatus": "provisional",
-      "eligibilityNote": "Minnesota residency requirement — check eligibility",
-      "cycleLabel": "2026"
-    }
-  },
-  {
-    "id": "ev_rec_banff",
-    "name": "Banff Centre Winter Residency",
-    "dueDate": "2027-01-20",
-    "description": "Dormant until autumn — opens in October for the winter cohort. Sits in Watching until its lead window. Provisional dates carried from last cycle.",
-    "url": "https://banffcentre.ca/",
-    "tags": ["residencies", "funded", "portfolio"],
-    "todos": [],
-    "status": "active",
-    "createdAt": "2025-10-10T09:00:00.000Z",
-    "completedAt": null,
-    "gardenedAt": null,
-    "recurrence": {
-      "openDate": "2026-10-15",
+      "openDate": "2027-01-15",
       "leadDays": 30,
-      "dateStatus": "provisional",
-      "eligibilityNote": "Self-directed residency stream",
-      "cycleLabel": "2026"
+      "dateStatus": "confirmed",
+      "cycleLabel": "2027"
     }
+  },
+  {
+    "id": "ev_setup",
+    "name": "Set up Until",
+    "dueDate": "2026-06-09",
+    "description": "Got the basics in place and learned how the horizons group things by how far out they are.",
+    "tags": ["admin"],
+    "todos": [
+      { "id": "td_s_import", "text": "Add a few real projects", "completed": true, "createdAt": "2026-06-08T09:00:00.000Z", "completedAt": "2026-06-09T12:00:00.000Z" },
+      { "id": "td_s_theme", "text": "Pick light or dark", "completed": true, "createdAt": "2026-06-08T09:00:00.000Z", "completedAt": "2026-06-09T12:05:00.000Z" }
+    ],
+    "status": "completed",
+    "createdAt": "2026-06-08T09:00:00.000Z",
+    "completedAt": "2026-06-09T12:10:00.000Z",
+    "closingNote": "Imported a few projects and got the feel for the horizons.",
+    "gardenedAt": null
   }
 ]
