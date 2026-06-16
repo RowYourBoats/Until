@@ -1041,16 +1041,15 @@ export default function EventList() {
     const longHorizon: EventItem[] = [];
     const overTheHorizon: EventItem[] = [];
     const watching: EventItem[] = [];     // recurring, dormant (today < openDate − leadDays)
-    const openingSoon: EventItem[] = [];  // recurring, surfaced but still provisional — "check the date"
 
     active.forEach(ev => {
-      // Recurring items sleep into Watching until their window opens. Exception:
-      // recurrenceImminentOverride items have a near-term deadline (current cycle is live),
-      // so they fall through to normal dueDate grouping instead of being parked.
+      // Recurring items sleep in Watching until their window opens, then arrive
+      // through the normal dueDate horizons like anything else (still flagged ≈ if
+      // the date's a guess). recurrenceImminentOverride items have a near-term
+      // deadline (current cycle is live), so they skip Watching entirely.
       if (ev.recurrence && !recurrenceImminentOverride(ev)) {
         if (TODAY.getTime() < recurrenceSurfaceTime(ev.recurrence)) { watching.push(ev); return; }
-        if (ev.recurrence.dateStatus === 'provisional') { openingSoon.push(ev); return; }
-        // confirmed recurring items fall through to normal dueDate horizon logic
+        // surfaced recurring items fall through to normal dueDate horizon logic
       }
       const diffTime = parseLocalDate(ev.dueDate).getTime() - TODAY.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -1061,9 +1060,8 @@ export default function EventList() {
     });
 
     watching.sort((a, b) => recurrenceSurfaceTime(a.recurrence!) - recurrenceSurfaceTime(b.recurrence!));
-    openingSoon.sort((a, b) => parseLocalDate(a.recurrence!.openDate).getTime() - parseLocalDate(b.recurrence!.openDate).getTime());
 
-    return { thisWeek, later, longHorizon, overTheHorizon, watching, openingSoon, archived };
+    return { thisWeek, later, longHorizon, overTheHorizon, watching, archived };
   }, [filteredEvents]);
 
   // --- Gardening session ---
@@ -2095,7 +2093,6 @@ export default function EventList() {
       <div className={styles.list}>
         {currentTab === 'ongoing' && (
           <>
-            {renderSection("Opening soon", groupedEvents.openingSoon, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective)}
             {renderSection("Over The Horizon", groupedEvents.overTheHorizon, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective)}
             {renderSection("Short Horizon", groupedEvents.thisWeek, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective)}
             {groupedEvents.later.length > 0 && (
