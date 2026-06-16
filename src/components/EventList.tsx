@@ -884,6 +884,23 @@ export default function EventList() {
     }
   };
 
+  // Quick-add a task to a horizon event without opening the edit form.
+  const handleQuickAddTodo = async (eventId: string, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const newTodo: TodoItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      text: trimmed,
+      completed: false,
+      createdAt: now(),
+      completedAt: null,
+    };
+    const updatedEvents = events.map(ev => ev.id === eventId
+      ? { ...ev, todos: [...(ev.todos || []), newTodo] }
+      : ev);
+    await saveEvents(updatedEvents);
+  };
+
   const handleNextActionChange = async (eventId: string, nextAction: string) => {
     const trimmed = nextAction.trim();
     const updatedEvents = events.map(ev => ev.id === eventId ? { ...ev, nextAction: trimmed || undefined } : ev);
@@ -2093,14 +2110,14 @@ export default function EventList() {
       <div className={styles.list}>
         {currentTab === 'ongoing' && (
           <>
-            {renderSection("Over The Horizon", groupedEvents.overTheHorizon, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective)}
-            {renderSection("Short Horizon", groupedEvents.thisWeek, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective)}
+            {renderSection("Over The Horizon", groupedEvents.overTheHorizon, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective, handleQuickAddTodo)}
+            {renderSection("Short Horizon", groupedEvents.thisWeek, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective, handleQuickAddTodo)}
             {groupedEvents.later.length > 0 && (
               <div className={styles.section}>
                 <h3 className={styles.foldHeader} onClick={() => { minimizedLockedRef.current = !minimizedLockedRef.current; setMinimized(minimizedLockedRef.current); }}>
                   {minimized ? '▸' : '▾'} Horizon ({groupedEvents.later.length})
                 </h3>
-                {!minimized && renderSection("", groupedEvents.later, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective)}
+                {!minimized && renderSection("", groupedEvents.later, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective, handleQuickAddTodo)}
               </div>
             )}
             {groupedEvents.longHorizon.length > 0 && (
@@ -2108,7 +2125,7 @@ export default function EventList() {
                 <h3 className={styles.foldHeader} onClick={() => setShowLongHorizon(v => !v)}>
                   {showLongHorizon ? '▾' : '▸'} Long Horizon ({groupedEvents.longHorizon.length})
                 </h3>
-                {showLongHorizon && renderSection("", groupedEvents.longHorizon, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective)}
+                {showLongHorizon && renderSection("", groupedEvents.longHorizon, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective, handleQuickAddTodo)}
               </div>
             )}
             {groupedEvents.watching.length > 0 && (
@@ -2116,13 +2133,13 @@ export default function EventList() {
                 <h3 className={styles.foldHeader} onClick={() => setShowWatching(v => !v)}>
                   {showWatching ? '▾' : '▸'} Watching ({groupedEvents.watching.length})
                 </h3>
-                {showWatching && renderSection("", groupedEvents.watching, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective)}
+                {showWatching && renderSection("", groupedEvents.watching, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective, handleQuickAddTodo)}
               </div>
             )}
           </>
         )}
         {currentTab === 'archive' && (
-          renderSection("Over The Horizon", groupedEvents.archived, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective)
+          renderSection("Over The Horizon", groupedEvents.archived, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective, handleQuickAddTodo)
         )}
         {activeFilters.length > 0 && filteredEvents.length === 0 && <div className={styles.empty}>No matching horizons</div>}
       </div>
@@ -2192,7 +2209,8 @@ function renderSection(
   showNextActions: boolean = false,
   onConfirmDates: (eventId: string) => void = () => {},
   onPromoteTodo: (eventId: string, todo: TodoItem) => void = () => {},
-  isTodoPromoted: (todoId: string) => boolean = () => false
+  isTodoPromoted: (todoId: string) => boolean = () => false,
+  onQuickAddTodo: (eventId: string, text: string) => void = () => {}
 ) {
   if (items.length === 0) return null;
   return (
@@ -2286,7 +2304,7 @@ function renderSection(
                     )}
                     <p className={styles.descText}>{event.description}</p>
 
-                    {event.todos && (event.todos || []).length > 0 && (
+                    {((event.todos || []).length > 0 || !isArchived) && (
                       <div className={styles.todoListDisplay}>
                         <div className={styles.todoListTitle}>Tasks</div>
                         {(event.todos || []).map(todo => (
@@ -2306,6 +2324,20 @@ function renderSection(
                             <span className={todo.completed ? styles.completedTodo : ""}>{todo.text}</span>
                           </div>
                         ))}
+                        {!isArchived && (
+                          <input
+                            type="text"
+                            className={styles.quickAddTodo}
+                            placeholder="+ add task"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                const el = e.target as HTMLInputElement;
+                                if (el.value.trim()) { onQuickAddTodo(event.id, el.value); el.value = ''; }
+                              }
+                            }}
+                          />
+                        )}
                       </div>
                     )}
 

@@ -385,6 +385,24 @@
   accent-color: var(--foreground);
 }
 
+/* Quick-add task row — aligns under the todo text (past the checkbox), Enter to add. */
+.quickAddTodo {
+  width: 100%;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 1.15rem;
+  outline: none;
+  color: var(--foreground);
+  padding: 0.2rem 0 0.2rem 1.9rem;
+  margin-top: 0.2rem;
+}
+
+.quickAddTodo::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
 .completedTodo {
   text-decoration: line-through;
   color: var(--text-secondary);
