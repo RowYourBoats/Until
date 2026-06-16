@@ -2,7 +2,7 @@
   {
     "id": "ev_welcome",
     "name": "Make this your own",
-    "dueDate": "2026-07-07",
+    "dueDate": "2026-06-20",
     "description": "A live demo — add your own projects, tasks, and habits. Nothing you do here is saved (the demo is read-only), so poke around freely. Tap a task below to send it to today's scratchpad.",
     "tags": ["admin"],
     "todos": [
@@ -14,12 +14,12 @@
     "status": "active",
     "createdAt": "2026-06-14T09:00:00.000Z",
     "completedAt": null,
-    "gardenedAt": "2026-06-15T10:00:00.000Z"
+    "gardenedAt": null
   },
   {
     "id": "ev_data",
     "name": "Own your data",
-    "dueDate": "2026-08-15",
+    "dueDate": "2026-06-27",
     "description": "Until keeps everything in plain JSON files you control — no account, no lock-in. Run it locally, back it up, or pipe it into your own tools.",
     "url": "https://github.com/RowYourBoats/Until",
     "tags": ["admin", "code"],
@@ -30,6 +30,23 @@
     ],
     "status": "active",
     "createdAt": "2026-06-12T09:00:00.000Z",
+    "completedAt": null,
+    "gardenedAt": null
+  },
+  {
+    "id": "ev_selfhost",
+    "name": "Run your own instance",
+    "dueDate": "2026-09-01",
+    "description": "Until is yours to host. Install it as a browser app, keep it running across reboots, and point it wherever you like.",
+    "url": "https://github.com/RowYourBoats/Until",
+    "tags": ["admin", "code"],
+    "todos": [
+      { "id": "td_sh_pwa", "text": "Set up as a browser-based app", "completed": false, "createdAt": "2026-06-13T09:00:00.000Z", "completedAt": null },
+      { "id": "td_sh_pm2", "text": "Run at startup with PM2", "completed": false, "createdAt": "2026-06-13T09:00:00.000Z", "completedAt": null },
+      { "id": "td_sh_domain", "text": "Point your domain at it", "completed": false, "createdAt": "2026-06-13T09:00:00.000Z", "completedAt": null }
+    ],
+    "status": "active",
+    "createdAt": "2026-06-13T09:00:00.000Z",
     "completedAt": null,
     "gardenedAt": null
   },
