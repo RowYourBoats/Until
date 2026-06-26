@@ -28,6 +28,12 @@
   gap: 1.5rem;
 }
 
+.syncStatus {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
 .tabs {
   display: flex;
   gap: 2rem;

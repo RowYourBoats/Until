@@ -10,6 +10,9 @@ const fitTextarea = (el: HTMLTextAreaElement | null) => {
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Minus, X, Globe, Calendar, Edit2, ExternalLink, Link2 } from "lucide-react";
 import styles from "./EventList.module.css";
+import { loadLocal, saveLocal, LS_KEYS } from "@/lib/localStore";
+import { useDriveSync } from "@/lib/useDriveSync";
+import type { AllDatasets, Persist } from "@/lib/driveSync";
 
 const TODAY = new Date();
 TODAY.setHours(0, 0, 0, 0);
@@ -58,6 +61,8 @@ interface EventItem {
   gardenedAt?: string | null;
   starred?: boolean;
   recurrence?: Recurrence;
+  updatedAt?: string;     // stamped on every change; drives last-write-wins on sync
+  deletedAt?: string;     // soft-delete tombstone (kept so deletes propagate on sync)
 }
 
 interface DailyTask {
@@ -72,6 +77,8 @@ interface DailyTask {
   completedAt?: string | null;
   changes?: string[];
   carriedFrom?: string;
+  updatedAt?: string;
+  deletedAt?: string;
 }
 
 interface RheiItem {
@@ -87,6 +94,8 @@ interface RheiItem {
     text: string;
     days: number[];  // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
   }>;
+  updatedAt?: string;
+  deletedAt?: string;
 }
 
 interface PomodoroSession {
@@ -101,6 +110,7 @@ interface PomodoroSession {
   durationSeconds: number;
   outcome?: 'completed' | 'fresh' | 'forceMajeure' | 'postponed' | 'aborted';
   forceMajeureReason?: string;
+  updatedAt?: string;
 }
 
 const AVAILABLE_TAGS: TagType[] = [
@@ -111,6 +121,23 @@ const AVAILABLE_TAGS: TagType[] = [
 ];
 
 const now = () => new Date().toISOString();
+
+// Stamp `updatedAt` on items that are new or whose content changed vs the previous
+// array, so the sync merge can resolve conflicts by newest-write-wins. Content is
+// compared excluding `updatedAt` itself so re-stamping never counts as a change.
+function stampUpdated<T extends { id: string; updatedAt?: string }>(prev: T[], next: T[]): T[] {
+  const prevById = new Map(prev.map(p => [p.id, p]));
+  const ts = now();
+  return next.map(item => {
+    const before = prevById.get(item.id);
+    if (before) {
+      const { updatedAt: _pa, ...restBefore } = before as Record<string, unknown> & T;
+      const { updatedAt: _na, ...restAfter } = item as Record<string, unknown> & T;
+      if (JSON.stringify(restBefore) === JSON.stringify(restAfter)) return item;
+    }
+    return { ...item, updatedAt: ts };
+  });
+}
 
 const formatDate = (dateStr: string) => {
   const [year, month, day] = dateStr.split('-').map(Number);
@@ -199,6 +226,7 @@ export default function EventList() {
   const [showFilters, setShowFilters] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [mounted, setMounted] = useState(false);
+  const { sync: runDriveSync, syncing, status: syncStatus, setStatus: setSyncStatus } = useDriveSync();
   const [currentTab, setCurrentTab] = useState<'ongoing' | 'archive'>('ongoing');
 
   // Daily task states
@@ -309,21 +337,33 @@ export default function EventList() {
 
   useEffect(() => {
     setMounted(true);
-    fetch("/api/events")
-      .then(res => res.json())
-      .then(data => setEvents(Array.isArray(data) ? data : []));
 
-    fetch("/api/daily-tasks")
-      .then(res => res.json())
-      .then(data => setDailyTasks(Array.isArray(data) ? data : []));
+    // Seed from localStorage first so the app is instant and works fully offline
+    // (a phone out of range of the PC has no server). Then refresh from the server
+    // if it's reachable; a failed GET keeps the local copy instead of blanking it.
+    setEvents(loadLocal(LS_KEYS.events, []));
+    setDailyTasks(loadLocal(LS_KEYS.dailyTasks, []));
+    setPomodoroSessions(loadLocal(LS_KEYS.pomodoroSessions, []));
+    setRheiItems(loadLocal(LS_KEYS.rhei, []));
 
-    fetch("/api/pomodoro-sessions")
-      .then(res => res.json())
-      .then(data => setPomodoroSessions(Array.isArray(data) ? data : []));
+    const refresh = <T,>(url: string, key: string, set: (v: T[]) => void) =>
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            set(data);
+            saveLocal(key, data);
+          }
+        })
+        .catch(() => {/* offline — keep the local copy seeded above */});
 
-    fetch("/api/rhei")
-      .then(res => res.json())
-      .then(data => setRheiItems(Array.isArray(data) ? data : []));
+    refresh("/api/events", LS_KEYS.events, setEvents);
+    refresh("/api/daily-tasks", LS_KEYS.dailyTasks, setDailyTasks);
+    refresh("/api/pomodoro-sessions", LS_KEYS.pomodoroSessions, setPomodoroSessions);
+    refresh("/api/rhei", LS_KEYS.rhei, setRheiItems);
+
+    const last = loadLocal<string | null>(LS_KEYS.lastSync, null);
+    if (last) setSyncStatus(`Synced ${last}`);
 
     if (typeof window !== 'undefined' && window.matchMedia("(prefers-color-scheme: dark)").matches) {
       setTheme('dark');
@@ -401,31 +441,85 @@ export default function EventList() {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
+  // Manual two-way sync through Google Drive — the shared hub for all devices.
+  // Merges the local snapshot with the Drive file (last-write-wins per item) and
+  // adopts the result. The PC additionally persists to disk + reconciles project
+  // folders via /api/sync; the phone/MacBook sync to Drive only. Failures surface
+  // in the status line, not thrown — the local data is untouched until a write
+  // succeeds. (See src/lib/driveSync.ts.)
+  const handleSync = () => {
+    const local: AllDatasets = { events, dailyTasks, rhei: rheiItems, pomodoroSessions };
+
+    const persist: Persist | undefined =
+      process.env.NEXT_PUBLIC_UNTIL_PC === '1'
+        ? async (merged) => {
+            const res = await fetch('/api/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(merged),
+            });
+            if (!res.ok) throw new Error(`PC persist HTTP ${res.status}`);
+            const j = await res.json();
+            return {
+              events: Array.isArray(j.events) ? j.events : merged.events,
+              dailyTasks: Array.isArray(j.dailyTasks) ? j.dailyTasks : merged.dailyTasks,
+              rhei: Array.isArray(j.rhei) ? j.rhei : merged.rhei,
+              pomodoroSessions: Array.isArray(j.pomodoroSessions) ? j.pomodoroSessions : merged.pomodoroSessions,
+            };
+          }
+        : undefined;
+
+    const apply = (m: AllDatasets) => {
+      if (Array.isArray(m.events)) { setEvents(m.events); saveLocal(LS_KEYS.events, m.events); }
+      if (Array.isArray(m.dailyTasks)) { setDailyTasks(m.dailyTasks); saveLocal(LS_KEYS.dailyTasks, m.dailyTasks); }
+      if (Array.isArray(m.rhei)) { setRheiItems(m.rhei); saveLocal(LS_KEYS.rhei, m.rhei); }
+      if (Array.isArray(m.pomodoroSessions)) { setPomodoroSessions(m.pomodoroSessions); saveLocal(LS_KEYS.pomodoroSessions, m.pomodoroSessions); }
+    };
+
+    runDriveSync(local, persist, apply);
+  };
+
+  // Each save: stamp changed items, commit to React state + localStorage (so the
+  // data is safe offline and survives reload), then attempt the server POST. A
+  // failed POST (phone out of range of the PC) is swallowed — the local copy holds
+  // until the next /api/sync reconciles it with the PC.
   const saveEvents = async (newEvents: EventItem[]) => {
-    setEvents(newEvents);
-    await fetch("/api/events", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newEvents),
-    });
+    const stamped = stampUpdated(events, newEvents);
+    setEvents(stamped);
+    saveLocal(LS_KEYS.events, stamped);
+    try {
+      await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(stamped),
+      });
+    } catch {/* offline */}
   };
 
   const saveDailyTasks = async (newTasks: DailyTask[]) => {
-    setDailyTasks(newTasks);
-    await fetch("/api/daily-tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newTasks),
-    });
+    const stamped = stampUpdated(dailyTasks, newTasks);
+    setDailyTasks(stamped);
+    saveLocal(LS_KEYS.dailyTasks, stamped);
+    try {
+      await fetch("/api/daily-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(stamped),
+      });
+    } catch {/* offline */}
   };
 
   const saveRheiItems = async (items: RheiItem[]) => {
-    setRheiItems(items);
-    await fetch("/api/rhei", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(items),
-    });
+    const stamped = stampUpdated(rheiItems, items);
+    setRheiItems(stamped);
+    saveLocal(LS_KEYS.rhei, stamped);
+    try {
+      await fetch("/api/rhei", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(stamped),
+      });
+    } catch {/* offline */}
   };
 
   const todayStr = useMemo(() => getDateStr(0), []);
@@ -478,14 +572,16 @@ export default function EventList() {
   };
 
   const handleDeleteRheiItem = (itemId: string) => {
-    // Also remove any daily task for today linked to this rhei item
-    const updatedTasks = dailyTasks.filter(
-      t => !(t.rheiItemId === itemId && t.date === todayStr)
+    // Also tombstone any daily task for today linked to this rhei item
+    const ts = now();
+    const updatedTasks = dailyTasks.map(t =>
+      (t.rheiItemId === itemId && t.date === todayStr && !t.deletedAt)
+        ? { ...t, deletedAt: ts } : t
     );
-    if (updatedTasks.length !== dailyTasks.length) {
+    if (updatedTasks.some((t, i) => t !== dailyTasks[i])) {
       saveDailyTasks(updatedTasks);
     }
-    saveRheiItems(rheiItems.filter(r => r.id !== itemId));
+    saveRheiItems(rheiItems.map(r => r.id === itemId ? { ...r, deletedAt: ts } : r));
   };
 
   const handleToggleRheiEngagement = (itemId: string) => {
@@ -677,12 +773,16 @@ export default function EventList() {
   };
 
   const savePomodoroSessions = async (sessions: PomodoroSession[]) => {
-    setPomodoroSessions(sessions);
-    await fetch("/api/pomodoro-sessions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(sessions),
-    });
+    const stamped = stampUpdated(pomodoroSessions, sessions);
+    setPomodoroSessions(stamped);
+    saveLocal(LS_KEYS.pomodoroSessions, stamped);
+    try {
+      await fetch("/api/pomodoro-sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(stamped),
+      });
+    } catch {/* offline */}
   };
 
   // One-shot backfill: when both sessions and rhei are loaded, link existing sessions to nowId by taskText match.
@@ -706,7 +806,7 @@ export default function EventList() {
 
   const tasksForSelectedDate = useMemo(() => {
     return dailyTasks
-      .filter(t => t.date === selectedDate)
+      .filter(t => !t.deletedAt && t.date === selectedDate)
       .sort((a, b) => Number(a.completed) - Number(b.completed));
   }, [dailyTasks, selectedDate]);
 
@@ -757,7 +857,7 @@ export default function EventList() {
   };
 
   const handleDeleteDailyTask = (taskId: string) => {
-    saveDailyTasks(dailyTasks.filter(t => t.id !== taskId));
+    saveDailyTasks(dailyTasks.map(t => t.id === taskId ? { ...t, deletedAt: now() } : t));
   };
 
   const handleLinkDailyTask = (taskId: string, eventId: string | undefined) => {
@@ -769,7 +869,7 @@ export default function EventList() {
   };
 
   const uncheckedPrior = useMemo(() => {
-    return dailyTasks.filter(t => t.date < todayStr && !t.completed && !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text)));
+    return dailyTasks.filter(t => !t.deletedAt && t.date < todayStr && !t.completed && !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text)));
   }, [dailyTasks, todayStr, rheiItems]);
 
   const handleCarryForward = () => {
@@ -787,7 +887,7 @@ export default function EventList() {
   };
 
   const activeEvents = useMemo(() => {
-    return events.filter(ev => (ev.status || 'active') === 'active');
+    return events.filter(ev => !ev.deletedAt && (ev.status || 'active') === 'active');
   }, [events]);
 
   const toggleExpand = (id: string) => {
@@ -909,17 +1009,13 @@ export default function EventList() {
 
   const handleDelete = async (eventId: string) => {
     if (!confirm('Are you sure you want to delete this task?')) return;
-    const updatedEvents = events.filter(ev => ev.id !== eventId);
-    const deletedEvent = events.find(ev => ev.id === eventId);
-    if (deletedEvent) {
-      // Send the deleted event info so the API can rename the folder
-      await fetch('/api/events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ events: updatedEvents, deleted: [deletedEvent] }),
-      });
-      setEvents(updatedEvents);
-    }
+    // Soft delete: tombstone the event so the deletion survives reload and
+    // propagates on sync (a hard remove would resurrect from the other device).
+    // The server moves the folder to _trash when it observes the tombstone.
+    const updatedEvents = events.map(ev =>
+      ev.id === eventId ? { ...ev, deletedAt: now() } : ev
+    );
+    await saveEvents(updatedEvents);
   };
 
   const handleStarToggle = async (eventId: string) => {
@@ -1042,7 +1138,7 @@ export default function EventList() {
   };
 
   const filteredEvents = useMemo(() => {
-    let result = events;
+    let result = events.filter(ev => !ev.deletedAt);
     if (activeFilters.length > 0) {
       result = result.filter(ev => activeFilters.every(f => (ev.tags || []).includes(f)));
     }
@@ -1481,6 +1577,10 @@ export default function EventList() {
           <button className={styles.textBtn} onClick={() => setShowFilters(!showFilters)}>
             Filter
           </button>
+          <button className={styles.textBtn} onClick={handleSync} disabled={syncing}>
+            {syncing ? 'Syncing…' : 'Sync'}
+          </button>
+          {syncStatus && <span className={styles.syncStatus}>{syncStatus}</span>}
         </div>
       </div>
 
@@ -1836,7 +1936,7 @@ export default function EventList() {
               </div>
             )}
             <AnimatePresence mode="popLayout">
-              {rheiItems.map(item => (
+              {rheiItems.filter(r => !r.deletedAt).map(item => (
                 <motion.div
                   key={item.id}
                   className={styles.taskRow}
