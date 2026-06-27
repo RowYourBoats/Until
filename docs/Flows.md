@@ -75,7 +75,7 @@ The name *Rhei* is from the Greek *panta rhei* — everything flows. The state k
 1. Type into the input and press Enter to add a task to whichever day's tab is active.
 2. **Click the task** (no checkbox) to toggle completion. Completed tasks collapse under a `Completed` header — click it to expand.
 3. **Link a task to a horizon** with the link icon. The task gets a `linkedEventId`; the horizon shows the task in its sub-list.
-4. **Carry forward.** When yesterday has unchecked tasks, today shows a button to bring them in. Carrying records `carriedFrom` so the lineage of an undone task is preserved.
+4. **Carry forward.** When yesterday has unchecked tasks, today shows a button to bring them in. Carrying is a *ledger move*: the original stays on its day as a dimmed "carried forward" record, and a fresh copy lands on today. `carriedFrom` records the chain's origin, `carriedTo` the successor — so an undone task's whole lineage is preserved, and "carried (still alive)" stays distinct from "deleted."
 5. **Tomorrow tab.** Drafts for the next day — type anything you've already decided about tomorrow so it's there when you wake up.
 6. **Repeating tab.** Switches to the Repeating list (see above). It lives in the same tab row because in practice you flip between today's loose tasks and your standing practices constantly.
 
@@ -193,7 +193,7 @@ Toggle **Day** / **Night** in the header. CSS variables drive a full light/dark 
 
 A flag in the codebase (`isPersonal = !process.env.NEXT_PUBLIC_VERCEL_ENV`) is `true` when you run Until locally and `false` on the Vercel deployment. It's currently unused at the UI level — both versions look the same — but it's available for future branching.
 
-The public Vercel deployment is **read-only** at runtime. It serves a tracked seed (`data-example/`) of fictional but plausible content so visitors see a realistic, populated UI. Nothing visitors do persists between cold starts. Locally, real `data/` files take over and the seed is invisible.
+The public Vercel deployment has a **read-only** filesystem — it never writes to disk and is a pure Google Drive client: the owner signs in and syncs, while a visitor sees an empty, local-only app (and can't sync — OAuth is org-internal). The `data-example/` demo seed is served only when `NEXT_PUBLIC_UNTIL_DEMO=1`, which is off by default. See [Architecture](./Architecture.md) for the full sync model.
 
 ---
 
@@ -204,7 +204,7 @@ A few things Until intentionally doesn't do:
 - **No deadlines as alerts.** Nothing pings you. Horizons surface by approaching, not by interrupting.
 - **No streaks.** Repeating tracks engagement history but never shames you for a break.
 - **No scoring.** No productivity score, no per-day rating, no graphs of your worth.
-- **No multi-user.** This is a single-user tool for a working life. Sharing is via the public Vercel snapshot, not by giving anyone an account.
+- **No multi-user.** This is a single-user tool for a working life. Your devices share one Google Drive file; there are no accounts for anyone else. Showing the app off is done with a separate, populated demo deployment, not by sharing your data.
 - **No required fields.** A horizon needs a name and a due date. Everything else — description, tags, todos, next action — is optional and arrives as the work reveals itself.
 
 The shape is closer to a field journal than a task tracker. The point isn't to capture every intention; it's to keep an honest, daily contact with the work you've actually committed to.

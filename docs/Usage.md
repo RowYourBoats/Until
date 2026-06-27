@@ -67,7 +67,8 @@ Switch between **Yesterday**, **Today**, **Tomorrow**, and **Repeating** tabs.
 - Type in the input and press Enter to add a task.
 - Click a task to toggle completion (no checkbox needed).
 - Link a task to a horizon using the link icon.
-- **Carry forward:** When unchecked tasks remain from yesterday, a button appears to bring them into today.
+- **Carry forward:** When unchecked tasks remain from yesterday, a button appears to bring them into today. The original stays on its day as a dimmed "carried forward" record (a ledger), so the history of what moved is preserved; a fresh copy lands on today.
+- **Sync:** A camouflaged button at the start of the header actions (transparent label) runs a manual two-way sync with Google Drive. See [Architecture](./Architecture.md#sync--devices).
 - **Completed group:** Completed tasks collapse under a `Completed` header. Click the header to expand/collapse.
 
 ## Repeating (Rhei)
@@ -140,6 +141,6 @@ Toggle between light and dark mode using the **Day** / **Night** button in the h
 
 ## Personal vs. public version
 
-The codebase exposes an `isPersonal` flag (`!process.env.NEXT_PUBLIC_VERCEL_ENV`) that is `true` locally and `false` on Vercel. It's currently unused at the UI level — both versions look the same — but kept available for future per-version branching. The Vercel deployment is read-only at runtime; data writes do not persist between cold starts.
+`isPersonal` (`!process.env.NEXT_PUBLIC_VERCEL_ENV`) is `true` locally and `false` on Vercel. The Vercel deployment has a read-only filesystem and never writes to disk — it's a pure Google Drive client (the owner signs in and syncs; a visitor sees an empty local-only app and can't sync, since OAuth is org-internal).
 
-When the local `data/` directory is empty (as on Vercel), the API routes fall back to a tracked `data-example/` folder containing fictional but plausible content. Visitors see a working, populated UI; nothing they do persists.
+The bundled `data-example/` demo seed is served **only** on a deployment with `NEXT_PUBLIC_UNTIL_DEMO=1` — off by default, so the real app starts empty. See [Architecture](./Architecture.md) for the sync model, env vars, and how to stand up a separate populated demo.
