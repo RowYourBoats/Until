@@ -898,8 +898,14 @@ export default function EventList() {
       carriedFrom: t.carriedFrom || t.date,
       changes: [...(t.changes || []), ts],
     }));
-    const remaining = dailyTasks.filter(t => !priorIds.has(t.id));
-    saveDailyTasks([...remaining, ...copies]);
+    // Tombstone the originals instead of dropping them, so the carry-forward
+    // propagates on sync. A plain array removal isn't a deletion to the union
+    // merge — Drive would resurrect the originals on the next sync, letting the
+    // same tasks be carried forward again and again (infinite duplication).
+    const carried = dailyTasks.map(t =>
+      priorIds.has(t.id) ? { ...t, deletedAt: ts } : t
+    );
+    saveDailyTasks([...carried, ...copies]);
   };
 
   const activeEvents = useMemo(() => {
