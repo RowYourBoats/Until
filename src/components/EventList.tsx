@@ -76,7 +76,9 @@ interface DailyTask {
   createdAt?: string;
   completedAt?: string | null;
   changes?: string[];
-  carriedFrom?: string;
+  carriedFrom?: string;   // origin date of the carry chain (set on the live copy)
+  carriedAt?: string;     // when THIS instance was carried forward — marks it a record, not active
+  carriedTo?: string;     // id of the successor (today's) task this was carried into
   updatedAt?: string;
   deletedAt?: string;
 }
@@ -745,11 +747,14 @@ export default function EventList() {
 
   const commitPromoteTodo = (eventId: string, todo: TodoItem) => {
     const ts = now();
-    const existing = dailyTasks.find(t => t.linkedTodoId === todo.id && t.date === todayStr);
+    const existing = dailyTasks.find(t => t.linkedTodoId === todo.id && t.date === todayStr && !t.deletedAt);
     if (existing) {
-      // Un-promote: remove the open linked task for today only — never drop a completed record.
+      // Un-promote: tombstone the open linked task — never drop a completed record.
+      // Must tombstone (not array-filter) so the removal propagates on sync; a plain
+      // drop would be resurrected by the union merge. A later re-promote finds no
+      // live match (deletedAt excluded above) and creates a fresh task.
       if (!existing.completed) {
-        saveDailyTasks(dailyTasks.filter(t => t.id !== existing.id));
+        saveDailyTasks(dailyTasks.map(t => t.id === existing.id ? { ...t, deletedAt: ts } : t));
       }
     } else {
       // Promote: add a fresh open daily task linked to the subtask.
@@ -885,21 +890,35 @@ export default function EventList() {
   };
 
   const uncheckedPrior = useMemo(() => {
-    return dailyTasks.filter(t => !t.deletedAt && t.date < todayStr && !t.completed && !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text)));
+    return dailyTasks.filter(t => !t.deletedAt && !t.carriedAt && t.date < todayStr && !t.completed && !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text)));
   }, [dailyTasks, todayStr, rheiItems]);
 
   const handleCarryForward = () => {
     const ts = now();
-    const priorIds = new Set(uncheckedPrior.map(t => t.id));
-    const copies = uncheckedPrior.map(t => ({
-      ...t,
-      id: Math.random().toString(36).substr(2, 9),
-      date: selectedDate,
-      carriedFrom: t.carriedFrom || t.date,
-      changes: [...(t.changes || []), ts],
-    }));
-    const remaining = dailyTasks.filter(t => !priorIds.has(t.id));
-    saveDailyTasks([...remaining, ...copies]);
+    // Ledger model: keep yesterday's instances as a "carried forward" record and
+    // add a fresh live row for today. We MARK the originals (carriedAt/carriedTo)
+    // rather than dropping or deleting them — a plain array removal isn't a deletion
+    // to the union-merge sync (Drive would resurrect them, re-show the carry button
+    // and duplicate), while deleting would conflate "carried, still alive" with
+    // "deleted". carriedFrom/carriedTo record the lineage in both directions.
+    const linkToCopy = new Map<string, string>();
+    const copies = uncheckedPrior.map(t => {
+      const copyId = Math.random().toString(36).substr(2, 9);
+      linkToCopy.set(t.id, copyId);
+      return {
+        ...t,
+        id: copyId,
+        date: selectedDate,
+        carriedFrom: t.carriedFrom || t.date,
+        carriedAt: undefined,
+        carriedTo: undefined,
+        changes: [...(t.changes || []), ts],
+      };
+    });
+    const marked = dailyTasks.map(t =>
+      linkToCopy.has(t.id) ? { ...t, carriedAt: ts, carriedTo: linkToCopy.get(t.id) } : t
+    );
+    saveDailyTasks([...marked, ...copies]);
   };
 
   const activeEvents = useMemo(() => {
@@ -2110,7 +2129,8 @@ export default function EventList() {
 
         {(() => {
           const visibleTasks = tasksForSelectedDate.filter(t => !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text)));
-          const incompleteTasks = visibleTasks.filter(t => !t.completed);
+          const incompleteTasks = visibleTasks.filter(t => !t.completed && !t.carriedAt);
+          const carriedTasks = visibleTasks.filter(t => !t.completed && t.carriedAt);
           const allCompleted = visibleTasks.filter(t => t.completed);
           const completedTasks = hideCompletedTasks ? [] : allCompleted;
           const renderTask = (task: DailyTask) => (
@@ -2168,11 +2188,39 @@ export default function EventList() {
               </div>
             </motion.div>
           );
+          // Carried-forward records: shown as a dimmed, non-interactive trace of
+          // what moved on, not an actionable task.
+          const renderCarried = (task: DailyTask) => (
+            <motion.div
+              key={task.id}
+              className={`${styles.taskRow} ${styles.taskCarried}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              layout="position"
+              transition={{ layout: { duration: 0.2 }, opacity: { duration: 0.15 } }}
+            >
+              <div className={styles.taskContent}>
+                <div className={styles.taskText}>{task.text}</div>
+                {task.linkedEventId && (
+                  <div className={styles.taskLinkedEvent}>
+                    {events.find(e => e.id === task.linkedEventId)?.name}
+                  </div>
+                )}
+              </div>
+              <span className={styles.taskCarriedTag}>carried forward</span>
+            </motion.div>
+          );
           return (
             <>
               <AnimatePresence mode="popLayout">
                 {incompleteTasks.map(renderTask)}
               </AnimatePresence>
+              {carriedTasks.length > 0 && (
+                <AnimatePresence mode="popLayout">
+                  {carriedTasks.map(renderCarried)}
+                </AnimatePresence>
+              )}
               {allCompleted.length > 0 && (
                 <div
                   className={styles.completedHeader}
