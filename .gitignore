@@ -17,6 +17,7 @@ projects/*
 
 # Environment
 .env*
+!.env.example
 
 # OS / editor
 .DS_Store

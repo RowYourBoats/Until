@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import { writeJsonAtomic, PERSIST_DISABLED } from "@/lib/atomicWrite";
-import { rebaseExampleDates } from "@/lib/exampleData";
+import { loadExampleFallback } from "@/lib/exampleData";
 import { reconcileEventFolders } from "@/lib/eventFolders";
 
 const filePath = path.join(process.cwd(), "data", "events.json");
@@ -13,12 +13,7 @@ export async function GET() {
     const data = await fs.readFile(filePath, "utf8");
     return NextResponse.json(JSON.parse(data));
   } catch {
-    try {
-      const data = await fs.readFile(examplePath, "utf8");
-      return NextResponse.json(rebaseExampleDates(JSON.parse(data)));
-    } catch {
-      return NextResponse.json([], { status: 200 });
-    }
+    return NextResponse.json(await loadExampleFallback(examplePath));
   }
 }
 

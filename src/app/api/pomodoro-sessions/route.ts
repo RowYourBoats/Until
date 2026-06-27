@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import { writeJsonAtomic } from "@/lib/atomicWrite";
-import { rebaseExampleDates } from "@/lib/exampleData";
+import { loadExampleFallback } from "@/lib/exampleData";
 
 const filePath = path.join(process.cwd(), "data", "pomodoro-sessions.json");
 const examplePath = path.join(process.cwd(), "data-example", "pomodoro-sessions.json");
@@ -12,12 +12,7 @@ export async function GET() {
     const data = await fs.readFile(filePath, "utf8");
     return NextResponse.json(JSON.parse(data));
   } catch {
-    try {
-      const data = await fs.readFile(examplePath, "utf8");
-      return NextResponse.json(rebaseExampleDates(JSON.parse(data)));
-    } catch {
-      return NextResponse.json([], { status: 200 });
-    }
+    return NextResponse.json(await loadExampleFallback(examplePath));
   }
 }
 

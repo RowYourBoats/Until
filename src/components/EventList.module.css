@@ -34,6 +34,19 @@
   opacity: 0.7;
 }
 
+/* Sync hides in plain sight: it sits with the other header actions and works
+   normally, but its label is invisible (text matches the background) so only
+   someone who knows it's there will click it. A faint hover reveal keeps it
+   findable with a mouse; on touch you just tap the known spot. */
+.syncStealth {
+  color: transparent;
+  transition: color 0.15s ease;
+}
+.syncStealth:hover {
+  color: var(--text-secondary);
+  opacity: 0.4;
+}
+
 .tabs {
   display: flex;
   gap: 2rem;

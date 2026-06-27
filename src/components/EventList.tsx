@@ -339,12 +339,17 @@ export default function EventList() {
     setMounted(true);
 
     // Seed from localStorage first so the app is instant and works fully offline
-    // (a phone out of range of the PC has no server). Then refresh from the server
-    // if it's reachable; a failed GET keeps the local copy instead of blanking it.
-    setEvents(loadLocal(LS_KEYS.events, []));
-    setDailyTasks(loadLocal(LS_KEYS.dailyTasks, []));
-    setPomodoroSessions(loadLocal(LS_KEYS.pomodoroSessions, []));
-    setRheiItems(loadLocal(LS_KEYS.rhei, []));
+    // (a phone out of range of the PC has no server).
+    const seeded = {
+      events: loadLocal<EventItem[]>(LS_KEYS.events, []),
+      dailyTasks: loadLocal<DailyTask[]>(LS_KEYS.dailyTasks, []),
+      pomodoroSessions: loadLocal<PomodoroSession[]>(LS_KEYS.pomodoroSessions, []),
+      rhei: loadLocal<RheiItem[]>(LS_KEYS.rhei, []),
+    };
+    setEvents(seeded.events);
+    setDailyTasks(seeded.dailyTasks);
+    setPomodoroSessions(seeded.pomodoroSessions);
+    setRheiItems(seeded.rhei);
 
     const refresh = <T,>(url: string, key: string, set: (v: T[]) => void) =>
       fetch(url)
@@ -357,10 +362,21 @@ export default function EventList() {
         })
         .catch(() => {/* offline — keep the local copy seeded above */});
 
-    refresh("/api/events", LS_KEYS.events, setEvents);
-    refresh("/api/daily-tasks", LS_KEYS.dailyTasks, setDailyTasks);
-    refresh("/api/pomodoro-sessions", LS_KEYS.pomodoroSessions, setPomodoroSessions);
-    refresh("/api/rhei", LS_KEYS.rhei, setRheiItems);
+    // On the PC the local data/ files are the source of truth, so always refresh.
+    // On a deployed instance (phone/MacBook via Vercel) the server has only the demo
+    // seed or nothing, so NEVER overwrite real data synced from Drive — refresh only
+    // to seed a dataset that's empty locally. Drive sync is the real cross-device path.
+    if (isPersonal) {
+      refresh("/api/events", LS_KEYS.events, setEvents);
+      refresh("/api/daily-tasks", LS_KEYS.dailyTasks, setDailyTasks);
+      refresh("/api/pomodoro-sessions", LS_KEYS.pomodoroSessions, setPomodoroSessions);
+      refresh("/api/rhei", LS_KEYS.rhei, setRheiItems);
+    } else {
+      if (seeded.events.length === 0) refresh("/api/events", LS_KEYS.events, setEvents);
+      if (seeded.dailyTasks.length === 0) refresh("/api/daily-tasks", LS_KEYS.dailyTasks, setDailyTasks);
+      if (seeded.pomodoroSessions.length === 0) refresh("/api/pomodoro-sessions", LS_KEYS.pomodoroSessions, setPomodoroSessions);
+      if (seeded.rhei.length === 0) refresh("/api/rhei", LS_KEYS.rhei, setRheiItems);
+    }
 
     const last = loadLocal<string | null>(LS_KEYS.lastSync, null);
     if (last) setSyncStatus(`Synced ${last}`);
@@ -1571,14 +1587,14 @@ export default function EventList() {
           </div>
         </div>
         <div className={styles.headerActions}>
+          <button className={`${styles.textBtn} ${styles.syncStealth}`} onClick={handleSync} disabled={syncing}>
+            {syncing ? 'Syncing…' : 'Sync'}
+          </button>
           <button className={styles.textBtn} onClick={toggleTheme}>
             {theme === 'light' ? 'Night' : 'Day'}
           </button>
           <button className={styles.textBtn} onClick={() => setShowFilters(!showFilters)}>
             Filter
-          </button>
-          <button className={styles.textBtn} onClick={handleSync} disabled={syncing}>
-            {syncing ? 'Syncing…' : 'Sync'}
           </button>
           {syncStatus && <span className={styles.syncStatus}>{syncStatus}</span>}
         </div>
