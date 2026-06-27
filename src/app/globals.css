@@ -3,7 +3,7 @@
   --foreground: #000000;
   --text-secondary: #000000;
   --accent-red: #ed0f0a;
-  --font-family: "PP Neue Montreal", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-family: var(--font-neue-montreal), "PP Neue Montreal", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
   /* Tag Colors – Dick Bruna palette */
   --tag-grants: #319f1a;
