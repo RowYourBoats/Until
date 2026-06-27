@@ -1586,6 +1586,9 @@ export default function EventList() {
             {TODAY.toLocaleDateString("en-US", { weekday: 'long', month: 'long', day: 'numeric' })}
           </div>
         </div>
+        <div className={styles.headerStatus}>
+          {syncStatus && <span className={styles.syncStatus}>{syncStatus}</span>}
+        </div>
         <div className={styles.headerActions}>
           <button className={`${styles.textBtn} ${styles.syncStealth}`} onClick={handleSync} disabled={syncing}>
             {syncing ? 'Syncing…' : 'Sync'}
@@ -1596,7 +1599,6 @@ export default function EventList() {
           <button className={styles.textBtn} onClick={() => setShowFilters(!showFilters)}>
             Filter
           </button>
-          {syncStatus && <span className={styles.syncStatus}>{syncStatus}</span>}
         </div>
       </div>
 
