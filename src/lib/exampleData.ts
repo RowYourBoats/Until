@@ -15,6 +15,15 @@
 export const SEED_ANCHOR = "2026-06-16";
 
 const DAY_MS = 86400000;
+
+/**
+ * Demo mode. The `data-example/` seed is served ONLY when this is on. It's off by
+ * default, so a deployment with no `data/` files (e.g. Vercel) serves nothing and
+ * is a pure Google-Drive client — which is what every real device wants. Set
+ * NEXT_PUBLIC_UNTIL_DEMO=1 on a separate, throwaway deployment to get the populated
+ * public demo back; never sign in / sync on that one, so it can't reach a Drive.
+ */
+export const DEMO_MODE = process.env.NEXT_PUBLIC_UNTIL_DEMO === "1";
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 const ISO_TS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z?$/;
 
@@ -60,4 +69,21 @@ export function rebaseExampleDates<T>(data: T): T {
   const days = anchorOffsetDays();
   if (days === 0) return data;
   return walk(data, days) as T;
+}
+
+/**
+ * The GET fallback used when a dataset has no real `data/` file. Returns the rebased
+ * `data-example/` seed only in DEMO_MODE; otherwise an empty array, so a non-demo
+ * deployment never injects demo content (which could otherwise be synced into a
+ * real Drive). Reads via dynamic import so `fs` stays out of any client bundle.
+ */
+export async function loadExampleFallback(examplePath: string): Promise<unknown[]> {
+  if (!DEMO_MODE) return [];
+  try {
+    const fs = await import("fs/promises");
+    const data = await fs.readFile(examplePath, "utf8");
+    return rebaseExampleDates(JSON.parse(data));
+  } catch {
+    return [];
+  }
 }
