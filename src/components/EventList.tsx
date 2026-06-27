@@ -1587,14 +1587,14 @@ export default function EventList() {
           </div>
         </div>
         <div className={styles.headerActions}>
+          <button className={`${styles.textBtn} ${styles.syncStealth}`} onClick={handleSync} disabled={syncing}>
+            {syncing ? 'Syncing…' : 'Sync'}
+          </button>
           <button className={styles.textBtn} onClick={toggleTheme}>
             {theme === 'light' ? 'Night' : 'Day'}
           </button>
           <button className={styles.textBtn} onClick={() => setShowFilters(!showFilters)}>
             Filter
-          </button>
-          <button className={styles.textBtn} onClick={handleSync} disabled={syncing}>
-            {syncing ? 'Syncing…' : 'Sync'}
           </button>
           {syncStatus && <span className={styles.syncStatus}>{syncStatus}</span>}
         </div>
