@@ -28,6 +28,13 @@
   gap: 1.5rem;
 }
 
+/* Middle slot: grows to fill the gap between the date and the actions so the
+   sync status sits centered in the header. Empty (no border/space) when idle. */
+.headerStatus {
+  flex: 1;
+  text-align: center;
+}
+
 .syncStatus {
   font-size: 0.85rem;
   color: var(--text-secondary);
@@ -38,11 +45,12 @@
    normally, but its label is invisible (text matches the background) so only
    someone who knows it's there will click it. A faint hover reveal keeps it
    findable with a mouse; on touch you just tap the known spot. */
-.syncStealth {
+/* Compound selector so it beats .textBtn's color regardless of source order. */
+.textBtn.syncStealth {
   color: transparent;
   transition: color 0.15s ease;
 }
-.syncStealth:hover {
+.textBtn.syncStealth:hover {
   color: var(--text-secondary);
   opacity: 0.4;
 }
