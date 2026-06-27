@@ -945,6 +945,21 @@
   opacity: 1;
 }
 
+/* Carried-forward record: a dimmed, non-interactive trace of a task that moved on. */
+.taskCarried {
+  opacity: 0.5;
+}
+.taskCarried .taskContent {
+  cursor: default;
+}
+.taskCarriedTag {
+  align-self: center;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
 .taskCheckbox {
   display: none;
 }
