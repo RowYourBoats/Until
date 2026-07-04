@@ -404,6 +404,9 @@ export default function EventList() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (document.activeElement !== document.body) return;
+      // Ignore OS key auto-repeat: a held key must read as ONE press (peek),
+      // not a stream of taps landing inside the double-tap window.
+      if (e.repeat) return;
       if (e.code === 'Space') {
         e.preventDefault();
         const t = Date.now();
@@ -477,6 +480,7 @@ export default function EventList() {
               body: JSON.stringify(merged),
             });
             if (!res.ok) throw new Error(`PC persist HTTP ${res.status}`);
+            setPersistFailing(false); // a healthy /api/sync write proves the server is back
             const j = await res.json();
             return {
               events: Array.isArray(j.events) ? j.events : merged.events,
@@ -499,45 +503,44 @@ export default function EventList() {
 
   // Each save: stamp changed items, commit to React state + localStorage (so the
   // data is safe offline and survives reload), then attempt the server POST. A
-  // failed POST (phone out of range of the PC) is swallowed — the local copy holds
-  // until the next /api/sync reconciles it with the PC.
+  // failed POST never blocks the save — the local copy holds until the next
+  // /api/sync reconciles it — but it must not be invisible either: a crash-looping
+  // server once swallowed five days of writes with no sign in the UI. Any failure
+  // (network throw or non-2xx) raises the header warning until a write lands.
+  const [persistFailing, setPersistFailing] = useState(false);
+  const postDataset = async (url: string, data: unknown) => {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setPersistFailing(false);
+    } catch {
+      setPersistFailing(true);
+    }
+  };
+
   const saveEvents = async (newEvents: EventItem[]) => {
     const stamped = stampUpdated(events, newEvents);
     setEvents(stamped);
     saveLocal(LS_KEYS.events, stamped);
-    try {
-      await fetch("/api/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(stamped),
-      });
-    } catch {/* offline */}
+    await postDataset("/api/events", stamped);
   };
 
   const saveDailyTasks = async (newTasks: DailyTask[]) => {
     const stamped = stampUpdated(dailyTasks, newTasks);
     setDailyTasks(stamped);
     saveLocal(LS_KEYS.dailyTasks, stamped);
-    try {
-      await fetch("/api/daily-tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(stamped),
-      });
-    } catch {/* offline */}
+    await postDataset("/api/daily-tasks", stamped);
   };
 
   const saveRheiItems = async (items: RheiItem[]) => {
     const stamped = stampUpdated(rheiItems, items);
     setRheiItems(stamped);
     saveLocal(LS_KEYS.rhei, stamped);
-    try {
-      await fetch("/api/rhei", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(stamped),
-      });
-    } catch {/* offline */}
+    await postDataset("/api/rhei", stamped);
   };
 
   const todayStr = useMemo(() => getDateStr(0), []);
@@ -797,13 +800,7 @@ export default function EventList() {
     const stamped = stampUpdated(pomodoroSessions, sessions);
     setPomodoroSessions(stamped);
     saveLocal(LS_KEYS.pomodoroSessions, stamped);
-    try {
-      await fetch("/api/pomodoro-sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(stamped),
-      });
-    } catch {/* offline */}
+    await postDataset("/api/pomodoro-sessions", stamped);
   };
 
   // One-shot backfill: when both sessions and rhei are loaded, link existing sessions to nowId by taskText match.
@@ -889,8 +886,16 @@ export default function EventList() {
     setLinkingTaskId(null);
   };
 
+  // A coherent carried-forward record: marked on a LATER local day than the task's
+  // own date (a task can't be carried before it existed). During the June-27 server
+  // outage an old cached client spread {...t} on carry, so copies inherited stale
+  // carriedAt marks dated before the task itself — treat those as live tasks, not
+  // records, so they stay actionable (complete/delete/link).
+  const isCarriedRecord = (t: DailyTask) =>
+    !!t.carriedAt && getDateStrFromTime(new Date(t.carriedAt).getTime()) > t.date;
+
   const uncheckedPrior = useMemo(() => {
-    return dailyTasks.filter(t => !t.deletedAt && !t.carriedAt && t.date < todayStr && !t.completed && !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text)));
+    return dailyTasks.filter(t => !t.deletedAt && !isCarriedRecord(t) && t.date < todayStr && !t.completed && !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text)));
   }, [dailyTasks, todayStr, rheiItems]);
 
   const handleCarryForward = () => {
@@ -1606,7 +1611,9 @@ export default function EventList() {
           </div>
         </div>
         <div className={styles.headerStatus}>
-          {syncStatus && <span className={styles.syncStatus}>{syncStatus}</span>}
+          {persistFailing
+            ? <span className={styles.persistWarning}>Local only — server not saving</span>
+            : syncStatus && <span className={styles.syncStatus}>{syncStatus}</span>}
         </div>
         <div className={styles.headerActions}>
           <button className={`${styles.textBtn} ${styles.syncStealth}`} onClick={handleSync} disabled={syncing}>
@@ -2129,8 +2136,8 @@ export default function EventList() {
 
         {(() => {
           const visibleTasks = tasksForSelectedDate.filter(t => !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text)));
-          const incompleteTasks = visibleTasks.filter(t => !t.completed && !t.carriedAt);
-          const carriedTasks = visibleTasks.filter(t => !t.completed && t.carriedAt);
+          const incompleteTasks = visibleTasks.filter(t => !t.completed && !isCarriedRecord(t));
+          const carriedTasks = visibleTasks.filter(t => !t.completed && isCarriedRecord(t));
           const allCompleted = visibleTasks.filter(t => t.completed);
           const completedTasks = hideCompletedTasks ? [] : allCompleted;
           const renderTask = (task: DailyTask) => (
@@ -2305,7 +2312,8 @@ export default function EventList() {
           </>
         )}
         {currentTab === 'archive' && (
-          renderSection("Over The Horizon", groupedEvents.archived, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective, handleQuickAddTodo)
+          // No section header — the Archive tab itself is the label.
+          renderSection("", groupedEvents.archived, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective, handleQuickAddTodo)
         )}
         {activeFilters.length > 0 && filteredEvents.length === 0 && <div className={styles.empty}>No matching horizons</div>}
       </div>

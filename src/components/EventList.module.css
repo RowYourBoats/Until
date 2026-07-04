@@ -41,6 +41,13 @@
   opacity: 0.7;
 }
 
+/* Raised when a save POST fails (server down / non-2xx): the change is safe in
+   localStorage but hasn't reached disk. Stays until a write gets through. */
+.persistWarning {
+  font-size: 0.85rem;
+  color: var(--accent-red);
+}
+
 /* Sync hides in plain sight: it sits with the other header actions and works
    normally, but its label is invisible (text matches the background) so only
    someone who knows it's there will click it. A faint hover reveal keeps it

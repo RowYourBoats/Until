@@ -38,6 +38,7 @@ The four datasets (~260 KB of text) sync across devices (PC, MacBook, iPhone) th
 - **Deployed app = pure Drive client.** On a deployed instance the client never overwrites local data from the server — it refreshes from `/api` only to seed a dataset that's empty locally (`isPersonal` gate in `EventList` mount). The PC, with authoritative `data/`, always refreshes.
 - **The iPhone uses the Vercel app** over public HTTPS + Drive — no PC running, no LAN, no certificates. The deployment is `noindex`'d (`src/app/robots.ts` + layout metadata).
 - **Stealth Sync button.** On the public app the Sync button is camouflaged (transparent label, first in the header actions: `date · [Sync] Night Filter`) so a visitor doesn't see it; the owner knows where it is. The `Synced …` status sits centered in the header.
+- **Save-failure indicator.** Every dataset POST checks the response; any failure (network throw or non-2xx) shows `Local only — server not saving` in red in the header until a write lands. The change itself is never lost — state + localStorage are written first. Added after a crash-looping server silently swallowed five days of writes behind the PWA shell.
 
 ## Data mutation rules (important)
 
@@ -46,6 +47,7 @@ The sync is a **union-by-id, last-write-wins merge with tombstones** (`src/lib/m
 - **Never remove a synced item by array-filtering it out.** An absent item is *not* a deletion to the merge — the other device's copy resurrects it on the next sync. Removals must be **soft**: set `deletedAt` (a tombstone). Tombstones are hidden at display-source filters and purged after 30 days (`purgeTombstones`).
 - Deletes (events, daily tasks, rhei) all set `deletedAt`. Nested arrays (e.g. an event's `todos`) ride on their parent's last-write-wins, so editing them in place is fine.
 - **Carry-forward uses a ledger, not a delete.** Carrying yesterday's unchecked tasks forward marks the originals `carriedAt` (+ `carriedTo` = successor id) and keeps them as a dimmed, non-interactive "carried forward" record; a fresh row is created for today with `carriedFrom` = the chain's origin date. The marker propagates on sync, so the task isn't resurrected or duplicated, and "carried (still alive)" stays distinct from "deleted." Carried records are *not* tombstones, so they persist as history.
+- **A carried mark is trusted only if coherent.** `isCarriedRecord` treats a task as a record only when `carriedAt` falls on a *later local day* than the task's own date — a task can't be carried before it existed. Incoherent marks (an old cached client once spread `{…t}` on carry, so copies inherited their ancestor's mark) render as normal live tasks, keeping them actionable instead of frozen.
 
 ## Setup
 
@@ -63,6 +65,8 @@ pm2 restart until    # after rebuilding — required for NEXT_PUBLIC_* changes
 ```
 
 > `NEXT_PUBLIC_*` vars are baked in at **build time**. After changing `.env.local`, rebuild (`npm run build`) — restarting PM2 alone won't pick them up. Same on Vercel: set the var, then redeploy.
+
+> **If saves stop persisting, check the server first.** A missing/stale `.next` makes `next start` crash-loop under PM2 while the PWA keeps serving the cached shell — the UI works, every write dies. Symptoms: red `Local only — server not saving` in the header, stale `data/*.json` mtimes, `↺` climbing in `pm2 status`. Diagnose with `pm2 logs until`; fix with `npm run build && pm2 restart until`.
 
 ### Environment variables
 
