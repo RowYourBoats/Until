@@ -83,15 +83,22 @@ export async function getAccessToken(interactive = true): Promise<string> {
     });
   }
   return new Promise<string>((resolve, reject) => {
+    // Guard against GIS never calling back (popup blocked outside a user gesture,
+    // window dismissed): the promise must always settle or `syncing` sticks true
+    // and the Sync button dies. Silent (non-interactive) calls also get a timeout.
+    let settled = false;
+    const fail = (msg: string) => { if (!settled) { settled = true; reject(new Error(msg)); } };
+    tokenClient.error_callback = (err: any) => fail(err?.type || "sign-in popup blocked");
     tokenClient.callback = (resp: any) => {
-      if (resp.error) return reject(new Error(resp.error));
+      if (resp.error) return fail(resp.error);
       cachedToken = { token: resp.access_token, expiresAt: Date.now() + (resp.expires_in ?? 3600) * 1000 };
-      resolve(resp.access_token);
+      if (!settled) { settled = true; resolve(resp.access_token); }
     };
+    if (!interactive) setTimeout(() => fail("silent sign-in timed out"), 30_000);
     try {
       tokenClient.requestAccessToken({ prompt: interactive ? "" : "none" });
     } catch (e) {
-      reject(e as Error);
+      fail((e as Error).message || "sign-in failed");
     }
   });
 }

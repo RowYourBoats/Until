@@ -68,7 +68,7 @@ Switch between **Yesterday**, **Today**, **Tomorrow**, and **Repeating** tabs.
 - Click a task to toggle completion (no checkbox needed).
 - Link a task to a horizon using the link icon.
 - **Carry forward:** When unchecked tasks remain from yesterday, a button appears to bring them into today. The original stays on its day as a dimmed "carried forward" record (a ledger), so the history of what moved is preserved; a fresh copy lands on today.
-- **Sync:** A camouflaged button at the start of the header actions (transparent label) runs a manual two-way sync with Google Drive. See [Architecture](./Architecture.md#sync--devices).
+- **Sync:** On startup, use **Sign in & sync** to connect this session, or choose **Later** to keep working locally. The prompt disappears after a successful sync. The Sync button stays visible until connected, then becomes camouflaged. After a first manual sync, the app also syncs silently every hour while open. The header shows `Syncing…` during either kind of sync and a local timestamp such as `Synced 10/12 12:34AM` after success. Older time-only records show `(date unknown)` until the next successful sync. If automatic sync fails, it shows `Auto-sync paused — press Sync`; press Sync to reconnect. See [Architecture](./Architecture.md#sync--devices).
 - **Completed group:** Completed tasks collapse under a `Completed` header. Click the header to expand/collapse.
 
 ## Repeating (Rhei)

@@ -41,6 +41,16 @@
   opacity: 0.7;
 }
 
+.syncPrompt {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
 /* Raised when a save POST fails (server down / non-2xx): the change is safe in
    localStorage but hasn't reached disk. Stays until a write gets through. */
 .persistWarning {

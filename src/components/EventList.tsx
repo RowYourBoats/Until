@@ -13,6 +13,8 @@ import styles from "./EventList.module.css";
 import { loadLocal, saveLocal, LS_KEYS } from "@/lib/localStore";
 import { useDriveSync } from "@/lib/useDriveSync";
 import type { AllDatasets, Persist } from "@/lib/driveSync";
+import { mergeById } from "@/lib/merge";
+import { formatSyncTime } from "@/lib/syncTime";
 
 const TODAY = new Date();
 TODAY.setHours(0, 0, 0, 0);
@@ -228,7 +230,9 @@ export default function EventList() {
   const [showFilters, setShowFilters] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [mounted, setMounted] = useState(false);
-  const { sync: runDriveSync, syncing, status: syncStatus, setStatus: setSyncStatus } = useDriveSync();
+  const { sync: runDriveSync, syncing, status: syncStatus, setStatus: setSyncStatus, needsLogin } = useDriveSync();
+  const [syncPromptDismissed, setSyncPromptDismissed] = useState(false);
+  const canSignIn = !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && process.env.NEXT_PUBLIC_UNTIL_DEMO !== '1';
   const [currentTab, setCurrentTab] = useState<'ongoing' | 'archive'>('ongoing');
 
   // Daily task states
@@ -381,7 +385,7 @@ export default function EventList() {
     }
 
     const last = loadLocal<string | null>(LS_KEYS.lastSync, null);
-    if (last) setSyncStatus(`Synced ${last}`);
+    if (last) setSyncStatus(`Synced ${formatSyncTime(last)}`);
 
     if (typeof window !== 'undefined' && window.matchMedia("(prefers-color-scheme: dark)").matches) {
       setTheme('dark');
@@ -468,7 +472,7 @@ export default function EventList() {
   // folders via /api/sync; the phone/MacBook sync to Drive only. Failures surface
   // in the status line, not thrown — the local data is untouched until a write
   // succeeds. (See src/lib/driveSync.ts.)
-  const handleSync = () => {
+  const handleSync = (interactive = true) => {
     const local: AllDatasets = { events, dailyTasks, rhei: rheiItems, pomodoroSessions };
 
     const persist: Persist | undefined =
@@ -492,13 +496,31 @@ export default function EventList() {
         : undefined;
 
     const apply = (m: AllDatasets) => {
-      if (Array.isArray(m.events)) { setEvents(m.events); saveLocal(LS_KEYS.events, m.events); }
-      if (Array.isArray(m.dailyTasks)) { setDailyTasks(m.dailyTasks); saveLocal(LS_KEYS.dailyTasks, m.dailyTasks); }
-      if (Array.isArray(m.rhei)) { setRheiItems(m.rhei); saveLocal(LS_KEYS.rhei, m.rhei); }
-      if (Array.isArray(m.pomodoroSessions)) { setPomodoroSessions(m.pomodoroSessions); saveLocal(LS_KEYS.pomodoroSessions, m.pomodoroSessions); }
+      // Preserve newer edits made while the Drive round-trip was in progress.
+      if (Array.isArray(m.events)) setEvents(current => {
+        const next = current === events ? m.events : mergeById(m.events, current);
+        saveLocal(LS_KEYS.events, next);
+        return next;
+      });
+      if (Array.isArray(m.dailyTasks)) setDailyTasks(current => {
+        const next = current === dailyTasks ? m.dailyTasks : mergeById(m.dailyTasks, current);
+        saveLocal(LS_KEYS.dailyTasks, next);
+        return next;
+      });
+      if (Array.isArray(m.rhei)) setRheiItems(current => {
+        const next = current === rheiItems ? m.rhei : mergeById(m.rhei, current);
+        saveLocal(LS_KEYS.rhei, next);
+        return next;
+      });
+      if (Array.isArray(m.pomodoroSessions)) setPomodoroSessions(current => {
+        const next = current === pomodoroSessions ? m.pomodoroSessions : mergeById(m.pomodoroSessions, current);
+        saveLocal(LS_KEYS.pomodoroSessions, next);
+        return next;
+      });
     };
 
-    runDriveSync(local, persist, apply);
+    if (syncing) return;
+    return runDriveSync(local, persist, apply, interactive);
   };
 
   // Each save: stamp changed items, commit to React state + localStorage (so the
@@ -513,6 +535,20 @@ export default function EventList() {
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+  // Hourly auto-sync. Silent (no consent popup): Google tokens last ~1h with no
+  // refresh token, so this mostly rides the session from the last manual Sync and
+  // skips quietly when that lapses. Devices that never synced (demo, visitors)
+  // have no lastSync stamp and are left alone.
+  const handleSyncRef = useRef(handleSync);
+  handleSyncRef.current = handleSync;
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!loadLocal<string | null>(LS_KEYS.lastSync, null)) return;
+      handleSyncRef.current(false);
+    }, 60 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
+
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1611,12 +1647,11 @@ export default function EventList() {
           </div>
         </div>
         <div className={styles.headerStatus}>
-          {persistFailing
-            ? <span className={styles.persistWarning}>Local only — server not saving</span>
-            : syncStatus && <span className={styles.syncStatus}>{syncStatus}</span>}
+          {persistFailing && <span className={styles.persistWarning}>Local only — server not saving</span>}
+          {syncStatus && <span className={styles.syncStatus}>{syncStatus}</span>}
         </div>
         <div className={styles.headerActions}>
-          <button className={`${styles.textBtn} ${styles.syncStealth}`} onClick={handleSync} disabled={syncing}>
+          <button className={`${styles.textBtn} ${needsLogin && canSignIn ? '' : styles.syncStealth}`} onClick={() => handleSync()} disabled={syncing}>
             {syncing ? 'Syncing…' : 'Sync'}
           </button>
           <button className={styles.textBtn} onClick={toggleTheme}>
@@ -1658,6 +1693,16 @@ export default function EventList() {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
+      {mounted && canSignIn && needsLogin && !syncPromptDismissed && (
+        <div className={styles.syncPrompt} role="status">
+          <span>Sign in and sync to start hourly syncing for this session.</span>
+          <button className={styles.textBtn} onClick={() => handleSync()} disabled={syncing}>
+            {syncing ? 'Syncing…' : 'Sign in & sync'}
+          </button>
+          <button className={styles.textBtn} onClick={() => setSyncPromptDismissed(true)}>Later</button>
+        </div>
+      )}
+
             onSubmit={handleSave}
           >
             <div className={styles.formHeader}>{editingId ? "Edit Horizon" : "New Horizon"}</div>
