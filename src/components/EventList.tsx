@@ -523,18 +523,6 @@ export default function EventList() {
     return runDriveSync(local, persist, apply, interactive);
   };
 
-  // Each save: stamp changed items, commit to React state + localStorage (so the
-  // data is safe offline and survives reload), then attempt the server POST. A
-  // failed POST never blocks the save — the local copy holds until the next
-  // /api/sync reconciles it — but it must not be invisible either: a crash-looping
-  // server once swallowed five days of writes with no sign in the UI. Any failure
-  // (network throw or non-2xx) raises the header warning until a write lands.
-  const [persistFailing, setPersistFailing] = useState(false);
-  const postDataset = async (url: string, data: unknown) => {
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
   // Hourly auto-sync. Silent (no consent popup): Google tokens last ~1h with no
   // refresh token, so this mostly rides the session from the last manual Sync and
   // skips quietly when that lapses. Devices that never synced (demo, visitors)
@@ -549,6 +537,18 @@ export default function EventList() {
     return () => clearInterval(id);
   }, []);
 
+  // Each save: stamp changed items, commit to React state + localStorage (so the
+  // data is safe offline and survives reload), then attempt the server POST. A
+  // failed POST never blocks the save — the local copy holds until the next
+  // /api/sync reconciles it — but it must not be invisible either: a crash-looping
+  // server once swallowed five days of writes with no sign in the UI. Any failure
+  // (network throw or non-2xx) raises the header warning until a write lands.
+  const [persistFailing, setPersistFailing] = useState(false);
+  const postDataset = async (url: string, data: unknown) => {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1663,6 +1663,16 @@ export default function EventList() {
         </div>
       </div>
 
+      {mounted && canSignIn && needsLogin && !syncPromptDismissed && (
+        <div className={styles.syncPrompt} role="status">
+          <span>Sign in and sync to start hourly syncing for this session.</span>
+          <button className={styles.textBtn} onClick={() => handleSync()} disabled={syncing}>
+            {syncing ? 'Syncing…' : 'Sign in & sync'}
+          </button>
+          <button className={styles.textBtn} onClick={() => setSyncPromptDismissed(true)}>Later</button>
+        </div>
+      )}
+
       <AnimatePresence>
         {showFilters && (
           <motion.div
@@ -1693,16 +1703,6 @@ export default function EventList() {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-      {mounted && canSignIn && needsLogin && !syncPromptDismissed && (
-        <div className={styles.syncPrompt} role="status">
-          <span>Sign in and sync to start hourly syncing for this session.</span>
-          <button className={styles.textBtn} onClick={() => handleSync()} disabled={syncing}>
-            {syncing ? 'Syncing…' : 'Sign in & sync'}
-          </button>
-          <button className={styles.textBtn} onClick={() => setSyncPromptDismissed(true)}>Later</button>
-        </div>
-      )}
-
             onSubmit={handleSave}
           >
             <div className={styles.formHeader}>{editingId ? "Edit Horizon" : "New Horizon"}</div>
