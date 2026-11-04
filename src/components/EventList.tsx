@@ -14,6 +14,7 @@ import { loadLocal, saveLocal, LS_KEYS } from "@/lib/localStore";
 import { useDriveSync } from "@/lib/useDriveSync";
 import type { AllDatasets, Persist } from "@/lib/driveSync";
 import { mergeById } from "@/lib/merge";
+import { isRheiShadowTask } from "@/lib/rhei";
 import { formatSyncTime } from "@/lib/syncTime";
 
 const TODAY = new Date();
@@ -76,6 +77,7 @@ interface DailyTask {
   linkedEventId?: string;
   linkedTodoId?: string;
   rheiItemId?: string;
+  rheiShadow?: boolean;   // the tap-created task for a Repeating item (survives renames)
   createdAt?: string;
   completedAt?: string | null;
   changes?: string[];
@@ -100,6 +102,7 @@ interface RheiItem {
     days: number[];  // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
   }>;
   archivedAt?: string;  // archived: hidden from the active list, history kept, restorable
+  isWorkout?: boolean;  // the item the Worked Out button logs to (set on edit, so renames keep the link)
   updatedAt?: string;
   deletedAt?: string;   // permanent delete (only reachable from the archive)
 }
@@ -624,14 +627,36 @@ export default function EventList() {
     setShowRheiScheduleEditor(false);
   };
 
+  // The item the Worked Out button logs to: the one flagged isWorkout, else the one
+  // named "Exercise". Archived and deleted items don't count.
+  const findWorkoutItem = (items: RheiItem[]) => {
+    const live = items.filter(r => !r.deletedAt && !r.archivedAt);
+    return live.find(r => r.isWorkout) ?? live.find(r => r.text === 'Exercise');
+  };
+
   const handleSaveRheiEdit = () => {
     if (!editingRheiId || !rheiFormText.trim()) return;
     const cleanSchedule = rheiEditSchedule.filter(s => s.text.trim() && s.days.length > 0);
+    const before = rheiItems.find(r => r.id === editingRheiId);
+    const newText = rheiFormText.trim();
+    const isWorkout = findWorkoutItem(rheiItems)?.id === editingRheiId;
     const updated = rheiItems.map(r =>
       r.id === editingRheiId
-        ? { ...r, text: rheiFormText.trim(), scheduledTasks: cleanSchedule.length > 0 ? cleanSchedule : undefined }
+        ? { ...r, text: newText, scheduledTasks: cleanSchedule.length > 0 ? cleanSchedule : undefined, ...(isWorkout && { isWorkout: true }) }
         : r
     );
+    // Renaming: carry the item's daily tasks along. Unflagged tap shadows are matched
+    // by text, so rewrite them (and flag them); "Old - sub" sub-tasks get the new prefix.
+    if (before && before.text !== newText) {
+      const oldPrefix = `${before.text} - `;
+      const renamed = dailyTasks.map(t => {
+        if (t.rheiItemId !== editingRheiId) return t;
+        if (t.text === before.text) return { ...t, text: newText, rheiShadow: true };
+        if (t.text.startsWith(oldPrefix)) return { ...t, text: `${newText} - ${t.text.slice(oldPrefix.length)}` };
+        return t;
+      });
+      if (renamed.some((t, i) => t !== dailyTasks[i])) saveDailyTasks(renamed);
+    }
     saveRheiItems(updated);
     setEditingRheiId(null);
     setRheiFormText("");
@@ -747,6 +772,7 @@ export default function EventList() {
           completed: false,
           date: todayStr,
           rheiItemId: itemId,
+          rheiShadow: true,
           createdAt: ts,
           completedAt: null,
           changes: [ts],
@@ -960,11 +986,10 @@ export default function EventList() {
     setLinkingTaskId(null);
   };
 
-  // A rhei-tap shadow: the daily task auto-created when a Now item is tapped, whose
-  // text still matches the item's. It is represented by the Now item itself, so it
-  // stays out of the daily list, the pomodoro picker and carry-forward.
+  // A rhei-tap shadow (see isRheiShadowTask): represented by the Repeating item
+  // itself, so it stays out of the daily list, the pomodoro picker and carry-forward.
   const isRheiShadow = useCallback(
-    (t: DailyTask) => !!t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text),
+    (t: DailyTask) => isRheiShadowTask(t, rheiItems),
     [rheiItems]
   );
 
@@ -2202,7 +2227,7 @@ export default function EventList() {
                     </>
                   )}
                   {isRheiEngagedTodayEffective(item.id) && editingRheiId !== item.id && (() => {
-                    const existingTasks = dailyTasks.filter(t => t.rheiItemId === item.id && t.date === todayStr && t.text !== item.text);
+                    const existingTasks = dailyTasks.filter(t => t.rheiItemId === item.id && t.date === todayStr && t.text !== item.text && !t.rheiShadow);
                     const isPending = pendingRheiState[item.id] === true && !isRheiEngagedToday(item.id);
                     const todayDay = new Date().getDay();
                     const previewScheduled = isPending && item.scheduledTasks
@@ -2486,7 +2511,7 @@ export default function EventList() {
 
       <div className={styles.bottomButtons}>
         {(() => {
-          const exercise = rheiItems.find(r => r.text === 'Exercise');
+          const exercise = findWorkoutItem(rheiItems);
           const isMarked = exercise
             ? isRheiEngagedTodayEffective(exercise.id)
             : workedOutFallback === todayStr;
