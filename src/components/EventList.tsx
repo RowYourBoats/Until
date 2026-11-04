@@ -260,6 +260,11 @@ export default function EventList() {
   const [newRheiText, setNewRheiText] = useState("");
   const [rheiConfirmDeleteId, setRheiConfirmDeleteId] = useState<string | null>(null);
   const [showArchivedRhei, setShowArchivedRhei] = useState(false);
+  // Undo window for a deleted daily task: the bar shows for UNDO_DELETE_MS.
+  const [undoDelete, setUndoDelete] = useState<{ id: string; text: string } | null>(null);
+  const undoDeleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const UNDO_DELETE_MS = 6000;
+  useEffect(() => () => { if (undoDeleteTimer.current) clearTimeout(undoDeleteTimer.current); }, []);
   const [showArchivedTodos, setShowArchivedTodos] = useState(false);
   const [todoConfirmDeleteId, setTodoConfirmDeleteId] = useState<string | null>(null);
   const [rheiAddendumText, setRheiAddendumText] = useState<Record<string, string>>({});
@@ -976,6 +981,23 @@ export default function EventList() {
 
   const handleDeleteDailyTask = (taskId: string) => {
     saveDailyTasks(dailyTasks.map(t => t.id === taskId ? { ...t, deletedAt: now() } : t));
+  };
+
+  // User-initiated delete: tombstone now, offer Undo for a few seconds.
+  const deleteDailyTaskWithUndo = (task: DailyTask) => {
+    handleDeleteDailyTask(task.id);
+    if (undoDeleteTimer.current) clearTimeout(undoDeleteTimer.current);
+    setUndoDelete({ id: task.id, text: task.text });
+    undoDeleteTimer.current = setTimeout(() => setUndoDelete(null), UNDO_DELETE_MS);
+  };
+
+  // Clearing deletedAt bumps updatedAt (stampUpdated) past the tombstone, so the
+  // restore also wins the last-write-wins merge on other devices.
+  const handleUndoDelete = () => {
+    if (!undoDelete) return;
+    if (undoDeleteTimer.current) clearTimeout(undoDeleteTimer.current);
+    saveDailyTasks(dailyTasks.map(t => t.id === undoDelete.id ? { ...t, deletedAt: undefined } : t));
+    setUndoDelete(null);
   };
 
   const handleLinkDailyTask = (taskId: string, eventId: string | undefined) => {
@@ -2227,7 +2249,7 @@ export default function EventList() {
                     </>
                   )}
                   {isRheiEngagedTodayEffective(item.id) && editingRheiId !== item.id && (() => {
-                    const existingTasks = dailyTasks.filter(t => t.rheiItemId === item.id && t.date === todayStr && t.text !== item.text && !t.rheiShadow);
+                    const existingTasks = dailyTasks.filter(t => t.rheiItemId === item.id && t.date === todayStr && t.text !== item.text && !t.rheiShadow && !t.deletedAt);
                     const isPending = pendingRheiState[item.id] === true && !isRheiEngagedToday(item.id);
                     const todayDay = new Date().getDay();
                     const previewScheduled = isPending && item.scheduledTasks
@@ -2253,7 +2275,7 @@ export default function EventList() {
                             >
                               {task.text.replace(`${item.text} - `, '')}
                             </span>
-                            <button className={styles.taskActionBtn} onClick={() => handleDeleteDailyTask(task.id)}>
+                            <button className={styles.taskActionBtn} onClick={() => deleteDailyTaskWithUndo(task)}>
                               <X size={14} />
                             </button>
                           </div>
@@ -2382,7 +2404,7 @@ export default function EventList() {
                     </div>
                   )}
                 </div>
-                <button className={styles.taskActionBtn} onClick={() => handleDeleteDailyTask(task.id)}>
+                <button className={styles.taskActionBtn} onClick={() => deleteDailyTaskWithUndo(task)}>
                   <X size={14} />
                 </button>
               </div>
@@ -2508,6 +2530,13 @@ export default function EventList() {
         )}
         {activeFilters.length > 0 && filteredEvents.length === 0 && <div className={styles.empty}>No matching horizons</div>}
       </div>
+
+      {undoDelete && (
+        <div className={styles.undoBar} role="status">
+          <span className={styles.undoBarText}>Deleted &ldquo;{undoDelete.text}&rdquo;</span>
+          <button className={styles.undoBarButton} onClick={handleUndoDelete}>Undo</button>
+        </div>
+      )}
 
       <div className={styles.bottomButtons}>
         {(() => {

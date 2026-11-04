@@ -1408,3 +1408,37 @@
   font-size: 0.85rem;
   opacity: 0.8;
 }
+
+/* Undo bar after deleting a daily task */
+.undoBar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 1rem;
+  background: var(--foreground);
+  color: var(--background);
+  border-radius: 4px;
+  z-index: 50;
+}
+
+.undoBarText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.undoBarButton {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  flex-shrink: 0;
+}
