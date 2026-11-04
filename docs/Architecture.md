@@ -6,7 +6,7 @@
 - **CSS Modules** with CSS variables for light/dark theming
 - **Framer Motion** for layout animations
 - **File-based JSON storage** — no database, just flat files in `/data/`
-- **Offline PWA** — a service worker (`public/sw.js`) caches the app shell; a localStorage mirror (`src/lib/localStore.ts`) keeps every dataset editable with no network and across reloads
+- **localStorage mirror** — (`src/lib/localStore.ts`) keeps every dataset editable with no network and across reloads. The old app-shell service worker was retired (it served stale builds after redeploys); `public/sw.js` is now a self-destructing stub that unregisters installed workers and must stay deployed
 - **Google Drive sync** — a single `until-data.json` in your Drive is the cross-device hub (`src/lib/drive.ts`, `src/lib/driveSync.ts`, `src/lib/useDriveSync.ts`)
 - **Lucide** for iconography
 
@@ -67,7 +67,7 @@ pm2 restart until    # after rebuilding — required for NEXT_PUBLIC_* changes
 
 > `NEXT_PUBLIC_*` vars are baked in at **build time**. After changing `.env.local`, rebuild (`npm run build`) — restarting PM2 alone won't pick them up. Same on Vercel: set the var, then redeploy.
 
-> **If saves stop persisting, check the server first.** A missing/stale `.next` makes `next start` crash-loop under PM2 while the PWA keeps serving the cached shell — the UI works, every write dies. Symptoms: red `Local only — server not saving` in the header, stale `data/*.json` mtimes, `↺` climbing in `pm2 status`. Diagnose with `pm2 logs until`; fix with `npm run build && pm2 restart until`.
+> **If saves stop persisting, check the server first.** A missing/stale `.next` makes `next start` crash-loop under PM2 while an already-open tab keeps working from state + localStorage — the UI works, every write dies. Symptoms: red `Local only — server not saving` in the header, stale `data/*.json` mtimes, `↺` climbing in `pm2 status`. Diagnose with `pm2 logs until`; fix with `npm run build && pm2 restart until`.
 
 ### Environment variables
 

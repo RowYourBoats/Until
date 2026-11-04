@@ -27,8 +27,8 @@ Horizons are projects or commitments with due dates. They're automatically sorte
 |---------|-------|------------------------|
 | Over The Horizon | Past due | Yes |
 | Short Horizon | 0 -- 15 days | Yes |
-| Horizon | 16 -- 180 days | No |
-| Long Horizon | 180+ days | No |
+| Horizon | 16 -- 45 days | No |
+| Long Horizon | 46+ days | No (own collapsible header, independent of Fold) |
 
 **Adding a horizon:** Click `New` in the tab row. Fill in name, due date, and optionally a URL, next action, description, to-do items, and tags. Click `New` again (now `×`) to cancel.
 
@@ -58,7 +58,7 @@ Below the filter bar:
 |--------|--------|
 | `On-going` / `Archive` | Switch between active horizons and the archive |
 | `New` (`×` while open) | Open / cancel the new-horizon form |
-| `Fold` / `Unfold` | Hide or show the `Horizon` and `Long Horizon` sections (state persists across tab/window blur) |
+| `Fold` / `Unfold` | Hide or show the `Horizon` section (open by default; `Long Horizon` has its own collapsible header) |
 
 ## Daily Tasks
 

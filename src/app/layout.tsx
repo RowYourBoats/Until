@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import ServiceWorkerRegister from "./ServiceWorkerRegister";
 
 const neueMontreal = localFont({
   src: [
@@ -36,7 +35,6 @@ export default function RootLayout({
   return (
     <html lang="en" className={neueMontreal.variable}>
       <body>
-        <ServiceWorkerRegister />
         {children}
       </body>
     </html>

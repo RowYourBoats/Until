@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useRef, useLayoutEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef, useLayoutEffect, useCallback } from "react";
 
 const fitTextarea = (el: HTMLTextAreaElement | null) => {
   if (!el) return;
@@ -223,6 +223,14 @@ const isLocalDate = (iso: string | null | undefined, dateStr: string) => {
   return local === dateStr;
 };
 
+// A coherent carried-forward record: marked on a LATER local day than the task's
+// own date (a task can't be carried before it existed). During the June-27 server
+// outage an old cached client spread {...t} on carry, so copies inherited stale
+// carriedAt marks dated before the task itself — treat those as live tasks, not
+// records, so they stay actionable (complete/delete/link).
+const isCarriedRecord = (t: DailyTask) =>
+  !!t.carriedAt && getDateStrFromTime(Date.parse(t.carriedAt)) > t.date;
+
 export default function EventList() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
@@ -297,6 +305,11 @@ export default function EventList() {
   // Rhei tap debounce: optimistic state per item + pending timers
   const [pendingRheiState, setPendingRheiState] = useState<Record<string, boolean>>({});
   const pendingRheiTimers = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // Debounce timers must commit through the LATEST closure, not the one captured
+  // at arm time: two taps inside the window would otherwise each save from the
+  // same stale array and the first commit is overwritten by the second.
+  const commitRheiToggleRef = useRef<(itemId: string) => void>(() => {});
+  const commitPromoteTodoRef = useRef<(eventId: string, todo: TodoItem) => void>(() => {});
   const RHEI_DEBOUNCE_MS = 2500;
 
   // Subtask promote tap debounce: optimistic state per todo + pending timers
@@ -308,10 +321,10 @@ export default function EventList() {
   // Long Horizon: always visible as a collapsible "Long Horizon (N)" header, folded by default
   const [showLongHorizon, setShowLongHorizon] = useState(false);
 
-  // Minimize state
-  const [minimized, setMinimized] = useState(true);
+  // Minimize state — Horizon (15–45 days) stays open by default; fold is opt-in
+  const [minimized, setMinimized] = useState(false);
   const [showNextActions, setShowNextActions] = useState(false);
-  const minimizedLockedRef = React.useRef(true);
+  const minimizedLockedRef = React.useRef(false);
   const nextActionsLockedRef = React.useRef(false);
   const shiftTapRef = React.useRef<number>(0);
   const spaceTapRef = React.useRef<number>(0);
@@ -397,11 +410,10 @@ export default function EventList() {
     }
   }, []);
 
-  // Auto-minimize on window blur, revert to locked states
+  // On window blur, revert peeks to locked states (don't force-fold Horizon)
   useEffect(() => {
     const handleBlur = () => {
-      minimizedLockedRef.current = true;
-      setMinimized(true);
+      setMinimized(minimizedLockedRef.current);
       setShowNextActions(nextActionsLockedRef.current);
     };
     window.addEventListener('blur', handleBlur);
@@ -689,7 +701,7 @@ export default function EventList() {
         const { [itemId]: _, ...rest } = prev;
         return rest;
       });
-      commitRheiToggle(itemId);
+      commitRheiToggleRef.current(itemId);
     }, RHEI_DEBOUNCE_MS);
   };
 
@@ -710,8 +722,11 @@ export default function EventList() {
           : r
       );
       saveRheiItems(updatedRhei);
-      const updatedTasks = dailyTasks.filter(
-        t => !(t.rheiItemId === itemId && t.date === todayStr)
+      // Tombstone (not array-filter) so the removal survives the union-merge sync;
+      // a plain drop is resurrected from the Drive/PC copy.
+      const updatedTasks = dailyTasks.map(t =>
+        (t.rheiItemId === itemId && t.date === todayStr && !t.deletedAt)
+          ? { ...t, deletedAt: ts } : t
       );
       saveDailyTasks(updatedTasks);
     } else {
@@ -723,7 +738,7 @@ export default function EventList() {
       );
       saveRheiItems(updatedRhei);
       // Only create daily task if one doesn't already exist
-      const alreadyExists = dailyTasks.some(t => t.rheiItemId === itemId && t.date === todayStr);
+      const alreadyExists = dailyTasks.some(t => t.rheiItemId === itemId && t.date === todayStr && !t.deletedAt);
       const newTasks: DailyTask[] = [];
       if (!alreadyExists) {
         newTasks.push({
@@ -744,7 +759,7 @@ export default function EventList() {
           .filter(st => st.days.includes(todayDay))
           .forEach(st => {
             const fullText = `${item.text} - ${st.text}`;
-            if (!dailyTasks.some(t => t.rheiItemId === itemId && t.date === todayStr && t.text === fullText)) {
+            if (!dailyTasks.some(t => t.rheiItemId === itemId && t.date === todayStr && t.text === fullText && !t.deletedAt)) {
               newTasks.push({
                 id: Math.random().toString(36).substr(2, 9),
                 text: fullText,
@@ -763,10 +778,11 @@ export default function EventList() {
       }
     }
   };
+  useEffect(() => { commitRheiToggleRef.current = commitRheiToggle; });
 
   // A subtask is "promoted today" when a daily task for today links back to it.
   const isTodoPromotedToday = (todoId: string): boolean =>
-    dailyTasks.some(t => t.linkedTodoId === todoId && t.date === todayStr);
+    dailyTasks.some(t => t.linkedTodoId === todoId && t.date === todayStr && !t.deletedAt);
 
   // Effective state respects an in-flight pending tap; falls back to committed state.
   const isTodoPromotedTodayEffective = (todoId: string): boolean => {
@@ -801,7 +817,7 @@ export default function EventList() {
         const { [todo.id]: _, ...rest } = prev;
         return rest;
       });
-      commitPromoteTodo(eventId, todo);
+      commitPromoteTodoRef.current(eventId, todo);
     }, RHEI_DEBOUNCE_MS);
   };
 
@@ -814,7 +830,7 @@ export default function EventList() {
       // drop would be resurrected by the union merge. A later re-promote finds no
       // live match (deletedAt excluded above) and creates a fresh task.
       if (!existing.completed) {
-        saveDailyTasks(dailyTasks.map(t => t.id === existing.id ? { ...t, deletedAt: ts } : t));
+        handleDeleteDailyTask(existing.id);
       }
     } else {
       // Promote: add a fresh open daily task linked to the subtask.
@@ -832,6 +848,7 @@ export default function EventList() {
       saveDailyTasks([...dailyTasks, newTask]);
     }
   };
+  useEffect(() => { commitPromoteTodoRef.current = commitPromoteTodo; });
 
   const handleAddRheiAddendum = (itemId: string) => {
     const text = (rheiAddendumText[itemId] || '').trim();
@@ -943,17 +960,29 @@ export default function EventList() {
     setLinkingTaskId(null);
   };
 
-  // A coherent carried-forward record: marked on a LATER local day than the task's
-  // own date (a task can't be carried before it existed). During the June-27 server
-  // outage an old cached client spread {...t} on carry, so copies inherited stale
-  // carriedAt marks dated before the task itself — treat those as live tasks, not
-  // records, so they stay actionable (complete/delete/link).
-  const isCarriedRecord = (t: DailyTask) =>
-    !!t.carriedAt && getDateStrFromTime(new Date(t.carriedAt).getTime()) > t.date;
+  // A rhei-tap shadow: the daily task auto-created when a Now item is tapped, whose
+  // text still matches the item's. It is represented by the Now item itself, so it
+  // stays out of the daily list, the pomodoro picker and carry-forward.
+  const isRheiShadow = useCallback(
+    (t: DailyTask) => !!t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text),
+    [rheiItems]
+  );
 
   const uncheckedPrior = useMemo(() => {
-    return dailyTasks.filter(t => !t.deletedAt && !isCarriedRecord(t) && t.date < todayStr && !t.completed && !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text)));
-  }, [dailyTasks, todayStr, rheiItems]);
+    return dailyTasks.filter(t => !t.deletedAt && !isCarriedRecord(t) && t.date < todayStr && !t.completed && !isRheiShadow(t));
+  }, [dailyTasks, todayStr, isRheiShadow]);
+
+  // The selected day's tasks partitioned once for the list and the pomodoro picker:
+  // live open rows, carried-forward records (dimmed trace), and completed rows.
+  const dailyView = useMemo(() => {
+    const visible = tasksForSelectedDate.filter(t => !isRheiShadow(t));
+    const open = visible.filter(t => !t.completed);
+    return {
+      incompleteTasks: open.filter(t => !isCarriedRecord(t)),
+      carriedTasks: open.filter(t => isCarriedRecord(t)),
+      allCompleted: visible.filter(t => t.completed),
+    };
+  }, [tasksForSelectedDate, isRheiShadow]);
 
   const handleCarryForward = () => {
     const ts = now();
@@ -967,13 +996,13 @@ export default function EventList() {
     const copies = uncheckedPrior.map(t => {
       const copyId = Math.random().toString(36).substr(2, 9);
       linkToCopy.set(t.id, copyId);
+      // The copy is the live row: it must not inherit the original's record marks.
+      const { carriedAt: _ca, carriedTo: _ct, ...live } = t;
       return {
-        ...t,
+        ...live,
         id: copyId,
         date: selectedDate,
         carriedFrom: t.carriedFrom || t.date,
-        carriedAt: undefined,
-        carriedTo: undefined,
         changes: [...(t.changes || []), ts],
       };
     });
@@ -1078,8 +1107,9 @@ export default function EventList() {
       });
     }
 
-    // Surface/sync a linked daily task for today (dedupe onto an existing one).
-    const existing = dailyTasks.find(t => t.linkedTodoId === todoId && t.date === todayStr);
+    // Surface/sync a linked daily task for today (dedupe onto an existing LIVE one —
+    // an un-promote leaves a tombstone behind, which must not absorb the completion).
+    const existing = dailyTasks.find(t => t.linkedTodoId === todoId && t.date === todayStr && !t.deletedAt);
     if (existing) {
       saveDailyTasks(dailyTasks.map(t => t.id === existing.id
         ? { ...t, completed: nextCompleted, completedAt: nextCompleted ? ts : null, changes: [...(t.changes || []), ts] }
@@ -1283,7 +1313,7 @@ export default function EventList() {
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       if (diffDays < 0) overTheHorizon.push(ev);
       else if (diffDays <= 15) thisWeek.push(ev);
-      else if (diffDays > 180) longHorizon.push(ev);
+      else if (diffDays > 45) longHorizon.push(ev);
       else later.push(ev);
     });
 
@@ -1940,10 +1970,10 @@ export default function EventList() {
                 </button>
               )}
 
-              {tasksForSelectedDate.filter(t => !t.completed && !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text))).length > 0 && (
+              {dailyView.incompleteTasks.length > 0 && (
                 <div className={styles.pomodoroGroupLabel}>Today&apos;s tasks</div>
               )}
-              {tasksForSelectedDate.filter(t => !t.completed && !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text))).map(task => (
+              {dailyView.incompleteTasks.map(task => (
                 <button
                   key={task.id}
                   className={`${styles.pomodoroTaskOption} ${task.id === pomodoroTaskId ? styles.pomodoroTaskSelected : ''}`}
@@ -2276,10 +2306,7 @@ export default function EventList() {
         />
 
         {(() => {
-          const visibleTasks = tasksForSelectedDate.filter(t => !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text)));
-          const incompleteTasks = visibleTasks.filter(t => !t.completed && !isCarriedRecord(t));
-          const carriedTasks = visibleTasks.filter(t => !t.completed && isCarriedRecord(t));
-          const allCompleted = visibleTasks.filter(t => t.completed);
+          const { incompleteTasks, carriedTasks, allCompleted } = dailyView;
           const completedTasks = hideCompletedTasks ? [] : allCompleted;
           const renderTask = (task: DailyTask) => (
             <motion.div
@@ -2364,11 +2391,9 @@ export default function EventList() {
               <AnimatePresence mode="popLayout">
                 {incompleteTasks.map(renderTask)}
               </AnimatePresence>
-              {carriedTasks.length > 0 && (
-                <AnimatePresence mode="popLayout">
-                  {carriedTasks.map(renderCarried)}
-                </AnimatePresence>
-              )}
+              <AnimatePresence mode="popLayout">
+                {carriedTasks.map(renderCarried)}
+              </AnimatePresence>
               {allCompleted.length > 0 && (
                 <div
                   className={styles.completedHeader}

@@ -57,6 +57,9 @@
   font-size: 0.85rem;
   color: var(--accent-red);
 }
+.persistWarning + .syncStatus {
+  margin-left: 0.6em;
+}
 
 /* Sync hides in plain sight: it sits with the other header actions and works
    normally, but its label is invisible (text matches the background) so only

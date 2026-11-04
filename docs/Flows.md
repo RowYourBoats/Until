@@ -16,8 +16,8 @@ Each section below describes one surface: how it behaves, what a normal session 
 |---|---|---|
 | Over The Horizon | Past due | Yes |
 | Short Horizon | 0–15 days | Yes |
-| Horizon | 16–180 days | No |
-| Long Horizon | 180+ days | No |
+| Horizon | 16–45 days | No |
+| Long Horizon | 46+ days | No (own collapsible header, independent of Fold) |
 
 **What it's for.** Most calendars treat time as a grid of slots. Horizons treats it as a landscape: things approach, pass overhead, or drift past unattended. The bands keep the imminent visible and the distant from crowding it out — without forcing you to delete or hide anything.
 
@@ -39,7 +39,7 @@ Each section below describes one surface: how it behaves, what a normal session 
 
 This is the system being honest about which overdue work you're actually carrying versus which has fallen off the map. Most overdue work in most systems is invisible. Here it's three distinct states of forgotten-ness.
 
-**Folded mode.** Click `Fold` in the tab row to hide the `Horizon` and `Long Horizon` sections, leaving only OTH and Short. This is the "what matters this fortnight" view. Hold **Space** to peek at the folded sections; double-tap **Space** to lock them open or shut. Fold state persists across reload.
+**Folded mode.** The `Horizon` section is open by default. Click `Fold` in the tab row to hide it, leaving only OTH and Short — the "what matters this fortnight" view. Hold **Space** to peek at the folded section; double-tap **Space** to lock it open or shut. `Long Horizon` has its own collapsible header, folded by default.
 
 ---
 
@@ -170,7 +170,7 @@ The shape of the bottom bar is intentional: the three things you owe a working d
 
 ## Folded peek
 
-**Hold Space** to peek at the `Horizon` and `Long Horizon` sections while in folded mode. Release to collapse. **Double-tap Space** to lock folded/unfolded.
+**Hold Space** to peek at the `Horizon` section while in folded mode. Release to collapse. **Double-tap Space** to lock folded/unfolded.
 
 Same logic as the next-action peek: a brief look without committing.
 
