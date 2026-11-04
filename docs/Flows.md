@@ -59,6 +59,7 @@ The name *Rhei* is from the Greek *panta rhei* — everything flows. The state k
 4. **Sub-tasks.** Once engaged, an `Add sub-task…` input appears under the item. Type something one-off (`finished chapter 4`, `cleaned brushes`) and press Enter. Sub-tasks are scoped to today and also appear in the Today tab.
 5. **Scheduled sub-tasks.** Edit a Repeating item (pencil icon) to attach weekday-specific sub-tasks — for example, "stretch shoulders" only on Mon/Wed/Fri. When you engage the item on a matching weekday, today's scheduled sub-tasks are created automatically. They appear as dimmed previews during the 2.5-second pending window so you can see what's about to be committed.
 6. **Disengaging.** Tap the engaged item again to disengage. Same 2.5-second undo window.
+7. **Retiring a practice.** Edit the item and choose **Archive**. It moves to a collapsed Archived group with its history intact, and can be restored any time. Deleting permanently is a separate, deliberate step from inside the archive, because the point of Repeating is the record.
 
 **Why the undo window exists.** Daily engagement tracking only works if the data is trustworthy. A single mis-tap polluting a month of history makes the record useless. The silent 2.5-second debounce means the dataset reflects deliberate choices, not finger slips. Repeating prioritizes long-term truthfulness over instant durability.
 

@@ -33,6 +33,7 @@ interface TodoItem {
   completed: boolean;
   createdAt?: string;
   completedAt?: string | null;
+  archivedAt?: string;    // archived (hidden, restorable) instead of dropped
 }
 
 // Recurring opportunity (residency / grant / competition). Presence of this
@@ -98,8 +99,9 @@ interface RheiItem {
     text: string;
     days: number[];  // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
   }>;
+  archivedAt?: string;  // archived: hidden from the active list, history kept, restorable
   updatedAt?: string;
-  deletedAt?: string;
+  deletedAt?: string;   // permanent delete (only reachable from the archive)
 }
 
 interface PomodoroSession {
@@ -246,6 +248,9 @@ export default function EventList() {
   const [rheiItems, setRheiItems] = useState<RheiItem[]>([]);
   const [newRheiText, setNewRheiText] = useState("");
   const [rheiConfirmDeleteId, setRheiConfirmDeleteId] = useState<string | null>(null);
+  const [showArchivedRhei, setShowArchivedRhei] = useState(false);
+  const [showArchivedTodos, setShowArchivedTodos] = useState(false);
+  const [todoConfirmDeleteId, setTodoConfirmDeleteId] = useState<string | null>(null);
   const [rheiAddendumText, setRheiAddendumText] = useState<Record<string, string>>({});
   const [editingRheiId, setEditingRheiId] = useState<string | null>(null);
   const [rheiFormText, setRheiFormText] = useState("");
@@ -628,11 +633,27 @@ export default function EventList() {
     setShowRheiScheduleEditor(false);
   };
 
+  // Archive: the default "remove". Hides the item from the active list but keeps it
+  // (and its engagement history) so it can be restored. Daily tasks are untouched;
+  // its tap shadows stay hidden because isRheiShadow still sees the item.
+  const handleArchiveRheiItem = (itemId: string) => {
+    saveRheiItems(rheiItems.map(r => r.id === itemId ? { ...r, archivedAt: now() } : r));
+  };
+
+  const handleRestoreRheiItem = (itemId: string) => {
+    saveRheiItems(rheiItems.map(r => r.id === itemId ? { ...r, archivedAt: undefined } : r));
+  };
+
+  // Permanent delete, reachable only from the archive. Tombstones the item and its
+  // tap shadows on every date: once the tombstone is purged, isRheiShadow no longer
+  // recognizes them and they would otherwise surface as unchecked prior tasks.
+  // Scheduled sub-task records ("Item - sub") are real history and are kept.
   const handleDeleteRheiItem = (itemId: string) => {
-    // Also tombstone any daily task for today linked to this rhei item
     const ts = now();
+    const item = rheiItems.find(r => r.id === itemId);
+    if (!item) return;
     const updatedTasks = dailyTasks.map(t =>
-      (t.rheiItemId === itemId && t.date === todayStr && !t.deletedAt)
+      (t.rheiItemId === itemId && t.text === item.text && !t.deletedAt)
         ? { ...t, deletedAt: ts } : t
     );
     if (updatedTasks.some((t, i) => t !== dailyTasks[i])) {
@@ -1003,11 +1024,29 @@ export default function EventList() {
     setNewTodoText("");
   };
 
+  // Archive a subtask (hidden, restorable) instead of dropping it. Todos ride on the
+  // parent event's last-write-wins, so the in-place edit syncs with the event.
   const handleRemoveTodo = (id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      todos: (prev.todos || []).map(t => t.id === id ? { ...t, archivedAt: now() } : t)
+    }));
+  };
+
+  const handleRestoreTodo = (id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      todos: (prev.todos || []).map(t => t.id === id ? { ...t, archivedAt: undefined } : t)
+    }));
+  };
+
+  // Permanent removal, reachable only from the archived list in the edit form.
+  const handlePurgeTodo = (id: string) => {
     setFormData(prev => ({
       ...prev,
       todos: (prev.todos || []).filter(t => t.id !== id)
     }));
+    setTodoConfirmDeleteId(null);
   };
 
   const toggleTodoCompletion = async (eventId: string, todoId: string) => {
@@ -1599,7 +1638,7 @@ export default function EventList() {
 
           <div className={styles.gardenField}>
             <div className={styles.todoListTitle}>Tasks</div>
-            {gardenTodos.map(todo => (
+            {gardenTodos.filter(t => !t.archivedAt).map(todo => (
               <div key={todo.id} className={styles.todoItem} onClick={() => gardenToggleTodo(todo.id)}>
                 <input type="checkbox" checked={todo.completed} readOnly className={styles.checkbox} />
                 <span className={todo.completed ? styles.completedTodo : ""}>{todo.text}</span>
@@ -1741,12 +1780,37 @@ export default function EventList() {
 
             <div className={styles.todoSection}>
               <div className={styles.todoHeader}>To-do List</div>
-              {formData.todos.map(todo => (
+              {formData.todos.filter(t => !t.archivedAt).map(todo => (
                 <div key={todo.id} className={styles.todoFormItem}>
                   <span>{todo.text}</span>
-                  <button type="button" onClick={() => handleRemoveTodo(todo.id)} className={styles.removeTodoBtn}><X size={14} /></button>
+                  <button type="button" onClick={() => handleRemoveTodo(todo.id)} className={styles.removeTodoBtn} title="Archive"><X size={14} /></button>
                 </div>
               ))}
+              {formData.todos.some(t => t.archivedAt) && (
+                <div className={styles.archivedGroup}>
+                  <div className={styles.foldHeader} onClick={() => setShowArchivedTodos(v => !v)}>
+                    {showArchivedTodos ? '▾' : '▸'} Archived ({formData.todos.filter(t => t.archivedAt).length})
+                  </div>
+                  {showArchivedTodos && formData.todos.filter(t => t.archivedAt).map(todo => (
+                    <div key={todo.id} className={styles.archivedRow}>
+                      <span className={`${styles.archivedText} ${todo.completed ? styles.completedTodo : ''}`}>{todo.text}</span>
+                      <span>
+                        {todoConfirmDeleteId === todo.id ? (
+                          <>
+                            <button type="button" className={styles.rheiScheduleToggle} onClick={() => handlePurgeTodo(todo.id)}>Confirm delete forever</button>
+                            <button type="button" className={styles.rheiScheduleToggle} onClick={() => setTodoConfirmDeleteId(null)}>Cancel</button>
+                          </>
+                        ) : (
+                          <>
+                            <button type="button" className={styles.rheiScheduleToggle} onClick={() => handleRestoreTodo(todo.id)}>Restore</button>
+                            <button type="button" className={styles.rheiScheduleToggle} onClick={() => setTodoConfirmDeleteId(todo.id)}>Delete permanently</button>
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className={styles.addTodoRow}>
                 <input
                   type="text"
@@ -1913,9 +1977,9 @@ export default function EventList() {
                   >
                     {ev.name}
                   </button>
-                  {ev.id === pomodoroEventId && (ev.todos || []).filter(t => !t.completed).length > 0 && (
+                  {ev.id === pomodoroEventId && (ev.todos || []).filter(t => !t.completed && !t.archivedAt).length > 0 && (
                     <div className={styles.pomodoroSubtasks}>
-                      {(ev.todos || []).filter(t => !t.completed).map(todo => (
+                      {(ev.todos || []).filter(t => !t.completed && !t.archivedAt).map(todo => (
                         <button
                           key={todo.id}
                           className={`${styles.pomodoroTaskOption} ${styles.pomodoroSubtaskOption} ${pomodoroTaskId === todo.id ? styles.pomodoroTaskSelected : ''}`}
@@ -2025,7 +2089,7 @@ export default function EventList() {
               </div>
             )}
             <AnimatePresence mode="popLayout">
-              {rheiItems.filter(r => !r.deletedAt).map(item => (
+              {rheiItems.filter(r => !r.deletedAt && !r.archivedAt).map(item => (
                 <motion.div
                   key={item.id}
                   className={styles.taskRow}
@@ -2083,14 +2147,7 @@ export default function EventList() {
                           + add task
                         </button>
                         <div>
-                          {rheiConfirmDeleteId === item.id ? (
-                            <>
-                              <button className={styles.rheiScheduleToggle} onClick={() => { handleDeleteRheiItem(item.id); setRheiConfirmDeleteId(null); setEditingRheiId(null); setRheiFormText(""); setRheiEditSchedule([]); }}>Confirm delete</button>
-                              <button className={styles.rheiScheduleToggle} onClick={() => setRheiConfirmDeleteId(null)}>Undo</button>
-                            </>
-                          ) : (
-                            <button className={styles.rheiScheduleToggle} onClick={() => setRheiConfirmDeleteId(item.id)}>Delete</button>
-                          )}
+                          <button className={styles.rheiScheduleToggle} onClick={() => { handleArchiveRheiItem(item.id); setEditingRheiId(null); setRheiFormText(""); setRheiEditSchedule([]); }}>Archive</button>
                           <button className={styles.rheiScheduleSave} onClick={handleSaveRheiEdit}>Save</button>
                           <button className={styles.rheiScheduleToggle} onClick={() => { setEditingRheiId(null); setRheiFormText(""); setRheiEditSchedule([]); setRheiConfirmDeleteId(null); }}>Cancel</button>
                         </div>
@@ -2167,6 +2224,45 @@ export default function EventList() {
                 </motion.div>
               ))}
             </AnimatePresence>
+            {(() => {
+              const archived = rheiItems.filter(r => !r.deletedAt && r.archivedAt);
+              if (archived.length === 0) return null;
+              return (
+                <div className={styles.archivedGroup}>
+                  <h3 className={styles.foldHeader} onClick={() => setShowArchivedRhei(v => !v)}>
+                    {showArchivedRhei ? '▾' : '▸'} Archived ({archived.length})
+                  </h3>
+                  {showArchivedRhei && archived.map(item => {
+                    const lastEngaged = item.engagements
+                      .filter(e => !e.removedAt)
+                      .map(e => e.date)
+                      .sort()
+                      .pop();
+                    return (
+                      <div key={item.id} className={styles.archivedRow}>
+                        <span className={styles.archivedText}>
+                          {item.text}
+                          <span className={styles.archivedMeta}>{lastEngaged ? ` · last ${lastEngaged}` : ' · never engaged'}</span>
+                        </span>
+                        <span>
+                          {rheiConfirmDeleteId === item.id ? (
+                            <>
+                              <button className={styles.rheiScheduleToggle} onClick={() => { handleDeleteRheiItem(item.id); setRheiConfirmDeleteId(null); }}>Confirm delete forever</button>
+                              <button className={styles.rheiScheduleToggle} onClick={() => setRheiConfirmDeleteId(null)}>Cancel</button>
+                            </>
+                          ) : (
+                            <>
+                              <button className={styles.rheiScheduleToggle} onClick={() => handleRestoreRheiItem(item.id)}>Restore</button>
+                              <button className={styles.rheiScheduleToggle} onClick={() => setRheiConfirmDeleteId(item.id)}>Delete permanently</button>
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </>
         ) : (
         <>
@@ -2472,7 +2568,7 @@ function renderSection(
                   <span className={`${styles.eventName} ${isArchived ? styles.archivedName : ""}`}>{event.name}</span>
                   {showNextActions && (() => {
                     const trimmedNextAction = event.nextAction?.trim() || "";
-                    const fallbackTodo = !trimmedNextAction ? event.todos?.find(t => !t.completed)?.text : undefined;
+                    const fallbackTodo = !trimmedNextAction ? event.todos?.find(t => !t.completed && !t.archivedAt)?.text : undefined;
                     return (
                       <div className={styles.nextActionRow}>
                         {(trimmedNextAction || fallbackTodo) && <span className={styles.nextActionHyphen}>–</span>}
@@ -2523,10 +2619,10 @@ function renderSection(
                     )}
                     <p className={styles.descText}>{event.description}</p>
 
-                    {((event.todos || []).length > 0 || !isArchived) && (
+                    {((event.todos || []).some(t => !t.archivedAt) || !isArchived) && (
                       <div className={styles.todoListDisplay}>
                         <div className={styles.todoListTitle}>Tasks</div>
-                        {(event.todos || []).map(todo => (
+                        {(event.todos || []).filter(t => !t.archivedAt).map(todo => (
                           <div
                             key={todo.id}
                             className={`${styles.todoItem} ${isTodoPromoted(todo.id) ? styles.todoPromoted : ""}`}

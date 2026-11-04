@@ -1381,3 +1381,27 @@
   opacity: 0.4;
   vertical-align: middle;
 }
+
+/* Archived group (Repeating items, project subtasks): hidden-but-kept, restorable */
+.archivedGroup {
+  margin-top: 0.667rem;
+}
+
+.archivedRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 4px 0;
+  color: var(--text-secondary);
+}
+
+.archivedText {
+  opacity: 0.6;
+}
+
+.archivedMeta {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}

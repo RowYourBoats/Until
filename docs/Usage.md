@@ -80,6 +80,8 @@ Repeating items are recurring practices you want to engage with daily.
 - **Sub-tasks:** When engaged, an `Add sub-task...` input appears. Type a one-off sub-task and press Enter. Sub-tasks are scoped to today.
 - **Scheduled sub-tasks:** Repeating items can have weekday-specific sub-tasks (configured via the edit pencil). When you engage the item, today's scheduled sub-tasks are created automatically. During the 2.5-second pending window they appear as dimmed previews.
 - Sub-tasks also appear in the Today tab, but the parent Repeating item itself stays only in the Repeating tab.
+- **Archive, don't delete.** The edit pencil has an **Archive** button. An archived item leaves the active list but keeps its full engagement history. It waits in a collapsed **Archived (n)** group at the bottom of the tab, showing the last day you engaged it.
+- From the Archived group you can **Restore** an item, or **Delete permanently** (two-step confirm). Permanent delete is the only way an item's history is erased.
 
 ## Pomodoro Timer
 
@@ -106,6 +108,8 @@ For each horizon, you can:
 - Read and edit the description
 - Update the next action
 - Check off or add to-do items (todos record `createdAt` and `completedAt`)
+
+In a horizon's edit form, the X next to a to-do item **archives** it rather than removing it. Archived items are hidden from the card, the Pomodoro picker and Gardening, and are listed under a collapsed **Archived (n)** group in the edit form with **Restore** and **Delete permanently**. Changes apply when you save the form.
 - **Save & Next** to commit changes, or **Skip** to move on
 
 The Garden button strikes through once every active horizon has been reviewed today.
