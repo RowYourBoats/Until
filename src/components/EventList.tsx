@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useRef, useLayoutEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef, useLayoutEffect, useCallback } from "react";
 
 const fitTextarea = (el: HTMLTextAreaElement | null) => {
   if (!el) return;
@@ -13,6 +13,9 @@ import styles from "./EventList.module.css";
 import { loadLocal, saveLocal, LS_KEYS } from "@/lib/localStore";
 import { useDriveSync } from "@/lib/useDriveSync";
 import type { AllDatasets, Persist } from "@/lib/driveSync";
+import { mergeById } from "@/lib/merge";
+import { isRheiShadowTask } from "@/lib/rhei";
+import { formatSyncTime } from "@/lib/syncTime";
 
 const TODAY = new Date();
 TODAY.setHours(0, 0, 0, 0);
@@ -31,6 +34,7 @@ interface TodoItem {
   completed: boolean;
   createdAt?: string;
   completedAt?: string | null;
+  archivedAt?: string;    // archived (hidden, restorable) instead of dropped
 }
 
 // Recurring opportunity (residency / grant / competition). Presence of this
@@ -73,6 +77,7 @@ interface DailyTask {
   linkedEventId?: string;
   linkedTodoId?: string;
   rheiItemId?: string;
+  rheiShadow?: boolean;   // the tap-created task for a Repeating item (survives renames)
   createdAt?: string;
   completedAt?: string | null;
   changes?: string[];
@@ -96,8 +101,10 @@ interface RheiItem {
     text: string;
     days: number[];  // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
   }>;
+  archivedAt?: string;  // archived: hidden from the active list, history kept, restorable
+  isWorkout?: boolean;  // the item the Worked Out button logs to (set on edit, so renames keep the link)
   updatedAt?: string;
-  deletedAt?: string;
+  deletedAt?: string;   // permanent delete (only reachable from the archive)
 }
 
 interface PomodoroSession {
@@ -219,6 +226,14 @@ const isLocalDate = (iso: string | null | undefined, dateStr: string) => {
   return local === dateStr;
 };
 
+// A coherent carried-forward record: marked on a LATER local day than the task's
+// own date (a task can't be carried before it existed). During the June-27 server
+// outage an old cached client spread {...t} on carry, so copies inherited stale
+// carriedAt marks dated before the task itself — treat those as live tasks, not
+// records, so they stay actionable (complete/delete/link).
+const isCarriedRecord = (t: DailyTask) =>
+  !!t.carriedAt && getDateStrFromTime(Date.parse(t.carriedAt)) > t.date;
+
 export default function EventList() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
@@ -228,7 +243,9 @@ export default function EventList() {
   const [showFilters, setShowFilters] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [mounted, setMounted] = useState(false);
-  const { sync: runDriveSync, syncing, status: syncStatus, setStatus: setSyncStatus } = useDriveSync();
+  const { sync: runDriveSync, syncing, status: syncStatus, setStatus: setSyncStatus, needsLogin } = useDriveSync();
+  const [syncPromptDismissed, setSyncPromptDismissed] = useState(false);
+  const canSignIn = !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && process.env.NEXT_PUBLIC_UNTIL_DEMO !== '1';
   const [currentTab, setCurrentTab] = useState<'ongoing' | 'archive'>('ongoing');
 
   // Daily task states
@@ -242,6 +259,14 @@ export default function EventList() {
   const [rheiItems, setRheiItems] = useState<RheiItem[]>([]);
   const [newRheiText, setNewRheiText] = useState("");
   const [rheiConfirmDeleteId, setRheiConfirmDeleteId] = useState<string | null>(null);
+  const [showArchivedRhei, setShowArchivedRhei] = useState(false);
+  // Undo window for a deleted daily task: the bar shows for UNDO_DELETE_MS.
+  const [undoDelete, setUndoDelete] = useState<{ id: string; text: string } | null>(null);
+  const undoDeleteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const UNDO_DELETE_MS = 6000;
+  useEffect(() => () => { if (undoDeleteTimer.current) clearTimeout(undoDeleteTimer.current); }, []);
+  const [showArchivedTodos, setShowArchivedTodos] = useState(false);
+  const [todoConfirmDeleteId, setTodoConfirmDeleteId] = useState<string | null>(null);
   const [rheiAddendumText, setRheiAddendumText] = useState<Record<string, string>>({});
   const [editingRheiId, setEditingRheiId] = useState<string | null>(null);
   const [rheiFormText, setRheiFormText] = useState("");
@@ -288,6 +313,11 @@ export default function EventList() {
   // Rhei tap debounce: optimistic state per item + pending timers
   const [pendingRheiState, setPendingRheiState] = useState<Record<string, boolean>>({});
   const pendingRheiTimers = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // Debounce timers must commit through the LATEST closure, not the one captured
+  // at arm time: two taps inside the window would otherwise each save from the
+  // same stale array and the first commit is overwritten by the second.
+  const commitRheiToggleRef = useRef<(itemId: string) => void>(() => {});
+  const commitPromoteTodoRef = useRef<(eventId: string, todo: TodoItem) => void>(() => {});
   const RHEI_DEBOUNCE_MS = 2500;
 
   // Subtask promote tap debounce: optimistic state per todo + pending timers
@@ -299,10 +329,10 @@ export default function EventList() {
   // Long Horizon: always visible as a collapsible "Long Horizon (N)" header, folded by default
   const [showLongHorizon, setShowLongHorizon] = useState(false);
 
-  // Minimize state
-  const [minimized, setMinimized] = useState(true);
+  // Minimize state — Horizon (15–45 days) stays open by default; fold is opt-in
+  const [minimized, setMinimized] = useState(false);
   const [showNextActions, setShowNextActions] = useState(false);
-  const minimizedLockedRef = React.useRef(true);
+  const minimizedLockedRef = React.useRef(false);
   const nextActionsLockedRef = React.useRef(false);
   const shiftTapRef = React.useRef<number>(0);
   const spaceTapRef = React.useRef<number>(0);
@@ -381,18 +411,17 @@ export default function EventList() {
     }
 
     const last = loadLocal<string | null>(LS_KEYS.lastSync, null);
-    if (last) setSyncStatus(`Synced ${last}`);
+    if (last) setSyncStatus(`Synced ${formatSyncTime(last)}`);
 
     if (typeof window !== 'undefined' && window.matchMedia("(prefers-color-scheme: dark)").matches) {
       setTheme('dark');
     }
   }, []);
 
-  // Auto-minimize on window blur, revert to locked states
+  // On window blur, revert peeks to locked states (don't force-fold Horizon)
   useEffect(() => {
     const handleBlur = () => {
-      minimizedLockedRef.current = true;
-      setMinimized(true);
+      setMinimized(minimizedLockedRef.current);
       setShowNextActions(nextActionsLockedRef.current);
     };
     window.addEventListener('blur', handleBlur);
@@ -404,6 +433,9 @@ export default function EventList() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (document.activeElement !== document.body) return;
+      // Ignore OS key auto-repeat: a held key must read as ONE press (peek),
+      // not a stream of taps landing inside the double-tap window.
+      if (e.repeat) return;
       if (e.code === 'Space') {
         e.preventDefault();
         const t = Date.now();
@@ -465,7 +497,7 @@ export default function EventList() {
   // folders via /api/sync; the phone/MacBook sync to Drive only. Failures surface
   // in the status line, not thrown — the local data is untouched until a write
   // succeeds. (See src/lib/driveSync.ts.)
-  const handleSync = () => {
+  const handleSync = (interactive = true) => {
     const local: AllDatasets = { events, dailyTasks, rhei: rheiItems, pomodoroSessions };
 
     const persist: Persist | undefined =
@@ -477,6 +509,7 @@ export default function EventList() {
               body: JSON.stringify(merged),
             });
             if (!res.ok) throw new Error(`PC persist HTTP ${res.status}`);
+            setPersistFailing(false); // a healthy /api/sync write proves the server is back
             const j = await res.json();
             return {
               events: Array.isArray(j.events) ? j.events : merged.events,
@@ -488,56 +521,87 @@ export default function EventList() {
         : undefined;
 
     const apply = (m: AllDatasets) => {
-      if (Array.isArray(m.events)) { setEvents(m.events); saveLocal(LS_KEYS.events, m.events); }
-      if (Array.isArray(m.dailyTasks)) { setDailyTasks(m.dailyTasks); saveLocal(LS_KEYS.dailyTasks, m.dailyTasks); }
-      if (Array.isArray(m.rhei)) { setRheiItems(m.rhei); saveLocal(LS_KEYS.rhei, m.rhei); }
-      if (Array.isArray(m.pomodoroSessions)) { setPomodoroSessions(m.pomodoroSessions); saveLocal(LS_KEYS.pomodoroSessions, m.pomodoroSessions); }
+      // Preserve newer edits made while the Drive round-trip was in progress.
+      if (Array.isArray(m.events)) setEvents(current => {
+        const next = current === events ? m.events : mergeById(m.events, current);
+        saveLocal(LS_KEYS.events, next);
+        return next;
+      });
+      if (Array.isArray(m.dailyTasks)) setDailyTasks(current => {
+        const next = current === dailyTasks ? m.dailyTasks : mergeById(m.dailyTasks, current);
+        saveLocal(LS_KEYS.dailyTasks, next);
+        return next;
+      });
+      if (Array.isArray(m.rhei)) setRheiItems(current => {
+        const next = current === rheiItems ? m.rhei : mergeById(m.rhei, current);
+        saveLocal(LS_KEYS.rhei, next);
+        return next;
+      });
+      if (Array.isArray(m.pomodoroSessions)) setPomodoroSessions(current => {
+        const next = current === pomodoroSessions ? m.pomodoroSessions : mergeById(m.pomodoroSessions, current);
+        saveLocal(LS_KEYS.pomodoroSessions, next);
+        return next;
+      });
     };
 
-    runDriveSync(local, persist, apply);
+    if (syncing) return;
+    return runDriveSync(local, persist, apply, interactive);
   };
+
+  // Hourly auto-sync. Silent (no consent popup): Google tokens last ~1h with no
+  // refresh token, so this mostly rides the session from the last manual Sync and
+  // skips quietly when that lapses. Devices that never synced (demo, visitors)
+  // have no lastSync stamp and are left alone.
+  const handleSyncRef = useRef(handleSync);
+  handleSyncRef.current = handleSync;
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (!loadLocal<string | null>(LS_KEYS.lastSync, null)) return;
+      handleSyncRef.current(false);
+    }, 60 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // Each save: stamp changed items, commit to React state + localStorage (so the
   // data is safe offline and survives reload), then attempt the server POST. A
-  // failed POST (phone out of range of the PC) is swallowed — the local copy holds
-  // until the next /api/sync reconciles it with the PC.
+  // failed POST never blocks the save — the local copy holds until the next
+  // /api/sync reconciles it — but it must not be invisible either: a crash-looping
+  // server once swallowed five days of writes with no sign in the UI. Any failure
+  // (network throw or non-2xx) raises the header warning until a write lands.
+  const [persistFailing, setPersistFailing] = useState(false);
+  const postDataset = async (url: string, data: unknown) => {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setPersistFailing(false);
+    } catch {
+      setPersistFailing(true);
+    }
+  };
+
   const saveEvents = async (newEvents: EventItem[]) => {
     const stamped = stampUpdated(events, newEvents);
     setEvents(stamped);
     saveLocal(LS_KEYS.events, stamped);
-    try {
-      await fetch("/api/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(stamped),
-      });
-    } catch {/* offline */}
+    await postDataset("/api/events", stamped);
   };
 
   const saveDailyTasks = async (newTasks: DailyTask[]) => {
     const stamped = stampUpdated(dailyTasks, newTasks);
     setDailyTasks(stamped);
     saveLocal(LS_KEYS.dailyTasks, stamped);
-    try {
-      await fetch("/api/daily-tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(stamped),
-      });
-    } catch {/* offline */}
+    await postDataset("/api/daily-tasks", stamped);
   };
 
   const saveRheiItems = async (items: RheiItem[]) => {
     const stamped = stampUpdated(rheiItems, items);
     setRheiItems(stamped);
     saveLocal(LS_KEYS.rhei, stamped);
-    try {
-      await fetch("/api/rhei", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(stamped),
-      });
-    } catch {/* offline */}
+    await postDataset("/api/rhei", stamped);
   };
 
   const todayStr = useMemo(() => getDateStr(0), []);
@@ -568,14 +632,36 @@ export default function EventList() {
     setShowRheiScheduleEditor(false);
   };
 
+  // The item the Worked Out button logs to: the one flagged isWorkout, else the one
+  // named "Exercise". Archived and deleted items don't count.
+  const findWorkoutItem = (items: RheiItem[]) => {
+    const live = items.filter(r => !r.deletedAt && !r.archivedAt);
+    return live.find(r => r.isWorkout) ?? live.find(r => r.text === 'Exercise');
+  };
+
   const handleSaveRheiEdit = () => {
     if (!editingRheiId || !rheiFormText.trim()) return;
     const cleanSchedule = rheiEditSchedule.filter(s => s.text.trim() && s.days.length > 0);
+    const before = rheiItems.find(r => r.id === editingRheiId);
+    const newText = rheiFormText.trim();
+    const isWorkout = findWorkoutItem(rheiItems)?.id === editingRheiId;
     const updated = rheiItems.map(r =>
       r.id === editingRheiId
-        ? { ...r, text: rheiFormText.trim(), scheduledTasks: cleanSchedule.length > 0 ? cleanSchedule : undefined }
+        ? { ...r, text: newText, scheduledTasks: cleanSchedule.length > 0 ? cleanSchedule : undefined, ...(isWorkout && { isWorkout: true }) }
         : r
     );
+    // Renaming: carry the item's daily tasks along. Unflagged tap shadows are matched
+    // by text, so rewrite them (and flag them); "Old - sub" sub-tasks get the new prefix.
+    if (before && before.text !== newText) {
+      const oldPrefix = `${before.text} - `;
+      const renamed = dailyTasks.map(t => {
+        if (t.rheiItemId !== editingRheiId) return t;
+        if (t.text === before.text) return { ...t, text: newText, rheiShadow: true };
+        if (t.text.startsWith(oldPrefix)) return { ...t, text: `${newText} - ${t.text.slice(oldPrefix.length)}` };
+        return t;
+      });
+      if (renamed.some((t, i) => t !== dailyTasks[i])) saveDailyTasks(renamed);
+    }
     saveRheiItems(updated);
     setEditingRheiId(null);
     setRheiFormText("");
@@ -589,11 +675,27 @@ export default function EventList() {
     setShowRheiScheduleEditor(false);
   };
 
+  // Archive: the default "remove". Hides the item from the active list but keeps it
+  // (and its engagement history) so it can be restored. Daily tasks are untouched;
+  // its tap shadows stay hidden because isRheiShadow still sees the item.
+  const handleArchiveRheiItem = (itemId: string) => {
+    saveRheiItems(rheiItems.map(r => r.id === itemId ? { ...r, archivedAt: now() } : r));
+  };
+
+  const handleRestoreRheiItem = (itemId: string) => {
+    saveRheiItems(rheiItems.map(r => r.id === itemId ? { ...r, archivedAt: undefined } : r));
+  };
+
+  // Permanent delete, reachable only from the archive. Tombstones the item and its
+  // tap shadows on every date: once the tombstone is purged, isRheiShadow no longer
+  // recognizes them and they would otherwise surface as unchecked prior tasks.
+  // Scheduled sub-task records ("Item - sub") are real history and are kept.
   const handleDeleteRheiItem = (itemId: string) => {
-    // Also tombstone any daily task for today linked to this rhei item
     const ts = now();
+    const item = rheiItems.find(r => r.id === itemId);
+    if (!item) return;
     const updatedTasks = dailyTasks.map(t =>
-      (t.rheiItemId === itemId && t.date === todayStr && !t.deletedAt)
+      (t.rheiItemId === itemId && t.text === item.text && !t.deletedAt)
         ? { ...t, deletedAt: ts } : t
     );
     if (updatedTasks.some((t, i) => t !== dailyTasks[i])) {
@@ -629,7 +731,7 @@ export default function EventList() {
         const { [itemId]: _, ...rest } = prev;
         return rest;
       });
-      commitRheiToggle(itemId);
+      commitRheiToggleRef.current(itemId);
     }, RHEI_DEBOUNCE_MS);
   };
 
@@ -650,8 +752,11 @@ export default function EventList() {
           : r
       );
       saveRheiItems(updatedRhei);
-      const updatedTasks = dailyTasks.filter(
-        t => !(t.rheiItemId === itemId && t.date === todayStr)
+      // Tombstone (not array-filter) so the removal survives the union-merge sync;
+      // a plain drop is resurrected from the Drive/PC copy.
+      const updatedTasks = dailyTasks.map(t =>
+        (t.rheiItemId === itemId && t.date === todayStr && !t.deletedAt)
+          ? { ...t, deletedAt: ts } : t
       );
       saveDailyTasks(updatedTasks);
     } else {
@@ -663,7 +768,7 @@ export default function EventList() {
       );
       saveRheiItems(updatedRhei);
       // Only create daily task if one doesn't already exist
-      const alreadyExists = dailyTasks.some(t => t.rheiItemId === itemId && t.date === todayStr);
+      const alreadyExists = dailyTasks.some(t => t.rheiItemId === itemId && t.date === todayStr && !t.deletedAt);
       const newTasks: DailyTask[] = [];
       if (!alreadyExists) {
         newTasks.push({
@@ -672,6 +777,7 @@ export default function EventList() {
           completed: false,
           date: todayStr,
           rheiItemId: itemId,
+          rheiShadow: true,
           createdAt: ts,
           completedAt: null,
           changes: [ts],
@@ -684,7 +790,7 @@ export default function EventList() {
           .filter(st => st.days.includes(todayDay))
           .forEach(st => {
             const fullText = `${item.text} - ${st.text}`;
-            if (!dailyTasks.some(t => t.rheiItemId === itemId && t.date === todayStr && t.text === fullText)) {
+            if (!dailyTasks.some(t => t.rheiItemId === itemId && t.date === todayStr && t.text === fullText && !t.deletedAt)) {
               newTasks.push({
                 id: Math.random().toString(36).substr(2, 9),
                 text: fullText,
@@ -703,10 +809,11 @@ export default function EventList() {
       }
     }
   };
+  useEffect(() => { commitRheiToggleRef.current = commitRheiToggle; });
 
   // A subtask is "promoted today" when a daily task for today links back to it.
   const isTodoPromotedToday = (todoId: string): boolean =>
-    dailyTasks.some(t => t.linkedTodoId === todoId && t.date === todayStr);
+    dailyTasks.some(t => t.linkedTodoId === todoId && t.date === todayStr && !t.deletedAt);
 
   // Effective state respects an in-flight pending tap; falls back to committed state.
   const isTodoPromotedTodayEffective = (todoId: string): boolean => {
@@ -741,7 +848,7 @@ export default function EventList() {
         const { [todo.id]: _, ...rest } = prev;
         return rest;
       });
-      commitPromoteTodo(eventId, todo);
+      commitPromoteTodoRef.current(eventId, todo);
     }, RHEI_DEBOUNCE_MS);
   };
 
@@ -754,7 +861,7 @@ export default function EventList() {
       // drop would be resurrected by the union merge. A later re-promote finds no
       // live match (deletedAt excluded above) and creates a fresh task.
       if (!existing.completed) {
-        saveDailyTasks(dailyTasks.map(t => t.id === existing.id ? { ...t, deletedAt: ts } : t));
+        handleDeleteDailyTask(existing.id);
       }
     } else {
       // Promote: add a fresh open daily task linked to the subtask.
@@ -772,6 +879,7 @@ export default function EventList() {
       saveDailyTasks([...dailyTasks, newTask]);
     }
   };
+  useEffect(() => { commitPromoteTodoRef.current = commitPromoteTodo; });
 
   const handleAddRheiAddendum = (itemId: string) => {
     const text = (rheiAddendumText[itemId] || '').trim();
@@ -797,13 +905,7 @@ export default function EventList() {
     const stamped = stampUpdated(pomodoroSessions, sessions);
     setPomodoroSessions(stamped);
     saveLocal(LS_KEYS.pomodoroSessions, stamped);
-    try {
-      await fetch("/api/pomodoro-sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(stamped),
-      });
-    } catch {/* offline */}
+    await postDataset("/api/pomodoro-sessions", stamped);
   };
 
   // One-shot backfill: when both sessions and rhei are loaded, link existing sessions to nowId by taskText match.
@@ -881,6 +983,23 @@ export default function EventList() {
     saveDailyTasks(dailyTasks.map(t => t.id === taskId ? { ...t, deletedAt: now() } : t));
   };
 
+  // User-initiated delete: tombstone now, offer Undo for a few seconds.
+  const deleteDailyTaskWithUndo = (task: DailyTask) => {
+    handleDeleteDailyTask(task.id);
+    if (undoDeleteTimer.current) clearTimeout(undoDeleteTimer.current);
+    setUndoDelete({ id: task.id, text: task.text });
+    undoDeleteTimer.current = setTimeout(() => setUndoDelete(null), UNDO_DELETE_MS);
+  };
+
+  // Clearing deletedAt bumps updatedAt (stampUpdated) past the tombstone, so the
+  // restore also wins the last-write-wins merge on other devices.
+  const handleUndoDelete = () => {
+    if (!undoDelete) return;
+    if (undoDeleteTimer.current) clearTimeout(undoDeleteTimer.current);
+    saveDailyTasks(dailyTasks.map(t => t.id === undoDelete.id ? { ...t, deletedAt: undefined } : t));
+    setUndoDelete(null);
+  };
+
   const handleLinkDailyTask = (taskId: string, eventId: string | undefined) => {
     const updated = dailyTasks.map(t =>
       t.id === taskId ? { ...t, linkedEventId: eventId } : t
@@ -889,9 +1008,28 @@ export default function EventList() {
     setLinkingTaskId(null);
   };
 
+  // A rhei-tap shadow (see isRheiShadowTask): represented by the Repeating item
+  // itself, so it stays out of the daily list, the pomodoro picker and carry-forward.
+  const isRheiShadow = useCallback(
+    (t: DailyTask) => isRheiShadowTask(t, rheiItems),
+    [rheiItems]
+  );
+
   const uncheckedPrior = useMemo(() => {
-    return dailyTasks.filter(t => !t.deletedAt && !t.carriedAt && t.date < todayStr && !t.completed && !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text)));
-  }, [dailyTasks, todayStr, rheiItems]);
+    return dailyTasks.filter(t => !t.deletedAt && !isCarriedRecord(t) && t.date < todayStr && !t.completed && !isRheiShadow(t));
+  }, [dailyTasks, todayStr, isRheiShadow]);
+
+  // The selected day's tasks partitioned once for the list and the pomodoro picker:
+  // live open rows, carried-forward records (dimmed trace), and completed rows.
+  const dailyView = useMemo(() => {
+    const visible = tasksForSelectedDate.filter(t => !isRheiShadow(t));
+    const open = visible.filter(t => !t.completed);
+    return {
+      incompleteTasks: open.filter(t => !isCarriedRecord(t)),
+      carriedTasks: open.filter(t => isCarriedRecord(t)),
+      allCompleted: visible.filter(t => t.completed),
+    };
+  }, [tasksForSelectedDate, isRheiShadow]);
 
   const handleCarryForward = () => {
     const ts = now();
@@ -905,13 +1043,13 @@ export default function EventList() {
     const copies = uncheckedPrior.map(t => {
       const copyId = Math.random().toString(36).substr(2, 9);
       linkToCopy.set(t.id, copyId);
+      // The copy is the live row: it must not inherit the original's record marks.
+      const { carriedAt: _ca, carriedTo: _ct, ...live } = t;
       return {
-        ...t,
+        ...live,
         id: copyId,
         date: selectedDate,
         carriedFrom: t.carriedFrom || t.date,
-        carriedAt: undefined,
-        carriedTo: undefined,
         changes: [...(t.changes || []), ts],
       };
     });
@@ -962,11 +1100,29 @@ export default function EventList() {
     setNewTodoText("");
   };
 
+  // Archive a subtask (hidden, restorable) instead of dropping it. Todos ride on the
+  // parent event's last-write-wins, so the in-place edit syncs with the event.
   const handleRemoveTodo = (id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      todos: (prev.todos || []).map(t => t.id === id ? { ...t, archivedAt: now() } : t)
+    }));
+  };
+
+  const handleRestoreTodo = (id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      todos: (prev.todos || []).map(t => t.id === id ? { ...t, archivedAt: undefined } : t)
+    }));
+  };
+
+  // Permanent removal, reachable only from the archived list in the edit form.
+  const handlePurgeTodo = (id: string) => {
     setFormData(prev => ({
       ...prev,
       todos: (prev.todos || []).filter(t => t.id !== id)
     }));
+    setTodoConfirmDeleteId(null);
   };
 
   const toggleTodoCompletion = async (eventId: string, todoId: string) => {
@@ -998,8 +1154,9 @@ export default function EventList() {
       });
     }
 
-    // Surface/sync a linked daily task for today (dedupe onto an existing one).
-    const existing = dailyTasks.find(t => t.linkedTodoId === todoId && t.date === todayStr);
+    // Surface/sync a linked daily task for today (dedupe onto an existing LIVE one —
+    // an un-promote leaves a tombstone behind, which must not absorb the completion).
+    const existing = dailyTasks.find(t => t.linkedTodoId === todoId && t.date === todayStr && !t.deletedAt);
     if (existing) {
       saveDailyTasks(dailyTasks.map(t => t.id === existing.id
         ? { ...t, completed: nextCompleted, completedAt: nextCompleted ? ts : null, changes: [...(t.changes || []), ts] }
@@ -1203,7 +1360,7 @@ export default function EventList() {
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
       if (diffDays < 0) overTheHorizon.push(ev);
       else if (diffDays <= 15) thisWeek.push(ev);
-      else if (diffDays > 180) longHorizon.push(ev);
+      else if (diffDays > 45) longHorizon.push(ev);
       else later.push(ev);
     });
 
@@ -1558,7 +1715,7 @@ export default function EventList() {
 
           <div className={styles.gardenField}>
             <div className={styles.todoListTitle}>Tasks</div>
-            {gardenTodos.map(todo => (
+            {gardenTodos.filter(t => !t.archivedAt).map(todo => (
               <div key={todo.id} className={styles.todoItem} onClick={() => gardenToggleTodo(todo.id)}>
                 <input type="checkbox" checked={todo.completed} readOnly className={styles.checkbox} />
                 <span className={todo.completed ? styles.completedTodo : ""}>{todo.text}</span>
@@ -1606,10 +1763,11 @@ export default function EventList() {
           </div>
         </div>
         <div className={styles.headerStatus}>
+          {persistFailing && <span className={styles.persistWarning}>Local only — server not saving</span>}
           {syncStatus && <span className={styles.syncStatus}>{syncStatus}</span>}
         </div>
         <div className={styles.headerActions}>
-          <button className={`${styles.textBtn} ${styles.syncStealth}`} onClick={handleSync} disabled={syncing}>
+          <button className={`${styles.textBtn} ${needsLogin && canSignIn ? '' : styles.syncStealth}`} onClick={() => handleSync()} disabled={syncing}>
             {syncing ? 'Syncing…' : 'Sync'}
           </button>
           <button className={styles.textBtn} onClick={toggleTheme}>
@@ -1620,6 +1778,16 @@ export default function EventList() {
           </button>
         </div>
       </div>
+
+      {mounted && canSignIn && needsLogin && !syncPromptDismissed && (
+        <div className={styles.syncPrompt} role="status">
+          <span>Sign in and sync to start hourly syncing for this session.</span>
+          <button className={styles.textBtn} onClick={() => handleSync()} disabled={syncing}>
+            {syncing ? 'Syncing…' : 'Sign in & sync'}
+          </button>
+          <button className={styles.textBtn} onClick={() => setSyncPromptDismissed(true)}>Later</button>
+        </div>
+      )}
 
       <AnimatePresence>
         {showFilters && (
@@ -1689,12 +1857,37 @@ export default function EventList() {
 
             <div className={styles.todoSection}>
               <div className={styles.todoHeader}>To-do List</div>
-              {formData.todos.map(todo => (
+              {formData.todos.filter(t => !t.archivedAt).map(todo => (
                 <div key={todo.id} className={styles.todoFormItem}>
                   <span>{todo.text}</span>
-                  <button type="button" onClick={() => handleRemoveTodo(todo.id)} className={styles.removeTodoBtn}><X size={14} /></button>
+                  <button type="button" onClick={() => handleRemoveTodo(todo.id)} className={styles.removeTodoBtn} title="Archive"><X size={14} /></button>
                 </div>
               ))}
+              {formData.todos.some(t => t.archivedAt) && (
+                <div className={styles.archivedGroup}>
+                  <div className={styles.foldHeader} onClick={() => setShowArchivedTodos(v => !v)}>
+                    {showArchivedTodos ? '▾' : '▸'} Archived ({formData.todos.filter(t => t.archivedAt).length})
+                  </div>
+                  {showArchivedTodos && formData.todos.filter(t => t.archivedAt).map(todo => (
+                    <div key={todo.id} className={styles.archivedRow}>
+                      <span className={`${styles.archivedText} ${todo.completed ? styles.completedTodo : ''}`}>{todo.text}</span>
+                      <span>
+                        {todoConfirmDeleteId === todo.id ? (
+                          <>
+                            <button type="button" className={styles.rheiScheduleToggle} onClick={() => handlePurgeTodo(todo.id)}>Confirm delete forever</button>
+                            <button type="button" className={styles.rheiScheduleToggle} onClick={() => setTodoConfirmDeleteId(null)}>Cancel</button>
+                          </>
+                        ) : (
+                          <>
+                            <button type="button" className={styles.rheiScheduleToggle} onClick={() => handleRestoreTodo(todo.id)}>Restore</button>
+                            <button type="button" className={styles.rheiScheduleToggle} onClick={() => setTodoConfirmDeleteId(todo.id)}>Delete permanently</button>
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className={styles.addTodoRow}>
                 <input
                   type="text"
@@ -1824,10 +2017,10 @@ export default function EventList() {
                 </button>
               )}
 
-              {tasksForSelectedDate.filter(t => !t.completed && !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text))).length > 0 && (
+              {dailyView.incompleteTasks.length > 0 && (
                 <div className={styles.pomodoroGroupLabel}>Today&apos;s tasks</div>
               )}
-              {tasksForSelectedDate.filter(t => !t.completed && !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text))).map(task => (
+              {dailyView.incompleteTasks.map(task => (
                 <button
                   key={task.id}
                   className={`${styles.pomodoroTaskOption} ${task.id === pomodoroTaskId ? styles.pomodoroTaskSelected : ''}`}
@@ -1861,9 +2054,9 @@ export default function EventList() {
                   >
                     {ev.name}
                   </button>
-                  {ev.id === pomodoroEventId && (ev.todos || []).filter(t => !t.completed).length > 0 && (
+                  {ev.id === pomodoroEventId && (ev.todos || []).filter(t => !t.completed && !t.archivedAt).length > 0 && (
                     <div className={styles.pomodoroSubtasks}>
-                      {(ev.todos || []).filter(t => !t.completed).map(todo => (
+                      {(ev.todos || []).filter(t => !t.completed && !t.archivedAt).map(todo => (
                         <button
                           key={todo.id}
                           className={`${styles.pomodoroTaskOption} ${styles.pomodoroSubtaskOption} ${pomodoroTaskId === todo.id ? styles.pomodoroTaskSelected : ''}`}
@@ -1973,7 +2166,7 @@ export default function EventList() {
               </div>
             )}
             <AnimatePresence mode="popLayout">
-              {rheiItems.filter(r => !r.deletedAt).map(item => (
+              {rheiItems.filter(r => !r.deletedAt && !r.archivedAt).map(item => (
                 <motion.div
                   key={item.id}
                   className={styles.taskRow}
@@ -2031,14 +2224,7 @@ export default function EventList() {
                           + add task
                         </button>
                         <div>
-                          {rheiConfirmDeleteId === item.id ? (
-                            <>
-                              <button className={styles.rheiScheduleToggle} onClick={() => { handleDeleteRheiItem(item.id); setRheiConfirmDeleteId(null); setEditingRheiId(null); setRheiFormText(""); setRheiEditSchedule([]); }}>Confirm delete</button>
-                              <button className={styles.rheiScheduleToggle} onClick={() => setRheiConfirmDeleteId(null)}>Undo</button>
-                            </>
-                          ) : (
-                            <button className={styles.rheiScheduleToggle} onClick={() => setRheiConfirmDeleteId(item.id)}>Delete</button>
-                          )}
+                          <button className={styles.rheiScheduleToggle} onClick={() => { handleArchiveRheiItem(item.id); setEditingRheiId(null); setRheiFormText(""); setRheiEditSchedule([]); }}>Archive</button>
                           <button className={styles.rheiScheduleSave} onClick={handleSaveRheiEdit}>Save</button>
                           <button className={styles.rheiScheduleToggle} onClick={() => { setEditingRheiId(null); setRheiFormText(""); setRheiEditSchedule([]); setRheiConfirmDeleteId(null); }}>Cancel</button>
                         </div>
@@ -2063,7 +2249,7 @@ export default function EventList() {
                     </>
                   )}
                   {isRheiEngagedTodayEffective(item.id) && editingRheiId !== item.id && (() => {
-                    const existingTasks = dailyTasks.filter(t => t.rheiItemId === item.id && t.date === todayStr && t.text !== item.text);
+                    const existingTasks = dailyTasks.filter(t => t.rheiItemId === item.id && t.date === todayStr && t.text !== item.text && !t.rheiShadow && !t.deletedAt);
                     const isPending = pendingRheiState[item.id] === true && !isRheiEngagedToday(item.id);
                     const todayDay = new Date().getDay();
                     const previewScheduled = isPending && item.scheduledTasks
@@ -2089,7 +2275,7 @@ export default function EventList() {
                             >
                               {task.text.replace(`${item.text} - `, '')}
                             </span>
-                            <button className={styles.taskActionBtn} onClick={() => handleDeleteDailyTask(task.id)}>
+                            <button className={styles.taskActionBtn} onClick={() => deleteDailyTaskWithUndo(task)}>
                               <X size={14} />
                             </button>
                           </div>
@@ -2115,6 +2301,45 @@ export default function EventList() {
                 </motion.div>
               ))}
             </AnimatePresence>
+            {(() => {
+              const archived = rheiItems.filter(r => !r.deletedAt && r.archivedAt);
+              if (archived.length === 0) return null;
+              return (
+                <div className={styles.archivedGroup}>
+                  <h3 className={styles.foldHeader} onClick={() => setShowArchivedRhei(v => !v)}>
+                    {showArchivedRhei ? '▾' : '▸'} Archived ({archived.length})
+                  </h3>
+                  {showArchivedRhei && archived.map(item => {
+                    const lastEngaged = item.engagements
+                      .filter(e => !e.removedAt)
+                      .map(e => e.date)
+                      .sort()
+                      .pop();
+                    return (
+                      <div key={item.id} className={styles.archivedRow}>
+                        <span className={styles.archivedText}>
+                          {item.text}
+                          <span className={styles.archivedMeta}>{lastEngaged ? ` · last ${lastEngaged}` : ' · never engaged'}</span>
+                        </span>
+                        <span>
+                          {rheiConfirmDeleteId === item.id ? (
+                            <>
+                              <button className={styles.rheiScheduleToggle} onClick={() => { handleDeleteRheiItem(item.id); setRheiConfirmDeleteId(null); }}>Confirm delete forever</button>
+                              <button className={styles.rheiScheduleToggle} onClick={() => setRheiConfirmDeleteId(null)}>Cancel</button>
+                            </>
+                          ) : (
+                            <>
+                              <button className={styles.rheiScheduleToggle} onClick={() => handleRestoreRheiItem(item.id)}>Restore</button>
+                              <button className={styles.rheiScheduleToggle} onClick={() => setRheiConfirmDeleteId(item.id)}>Delete permanently</button>
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </>
         ) : (
         <>
@@ -2128,10 +2353,7 @@ export default function EventList() {
         />
 
         {(() => {
-          const visibleTasks = tasksForSelectedDate.filter(t => !(t.rheiItemId && rheiItems.some(r => r.id === t.rheiItemId && r.text === t.text)));
-          const incompleteTasks = visibleTasks.filter(t => !t.completed && !t.carriedAt);
-          const carriedTasks = visibleTasks.filter(t => !t.completed && t.carriedAt);
-          const allCompleted = visibleTasks.filter(t => t.completed);
+          const { incompleteTasks, carriedTasks, allCompleted } = dailyView;
           const completedTasks = hideCompletedTasks ? [] : allCompleted;
           const renderTask = (task: DailyTask) => (
             <motion.div
@@ -2182,7 +2404,7 @@ export default function EventList() {
                     </div>
                   )}
                 </div>
-                <button className={styles.taskActionBtn} onClick={() => handleDeleteDailyTask(task.id)}>
+                <button className={styles.taskActionBtn} onClick={() => deleteDailyTaskWithUndo(task)}>
                   <X size={14} />
                 </button>
               </div>
@@ -2216,11 +2438,9 @@ export default function EventList() {
               <AnimatePresence mode="popLayout">
                 {incompleteTasks.map(renderTask)}
               </AnimatePresence>
-              {carriedTasks.length > 0 && (
-                <AnimatePresence mode="popLayout">
-                  {carriedTasks.map(renderCarried)}
-                </AnimatePresence>
-              )}
+              <AnimatePresence mode="popLayout">
+                {carriedTasks.map(renderCarried)}
+              </AnimatePresence>
               {allCompleted.length > 0 && (
                 <div
                   className={styles.completedHeader}
@@ -2305,14 +2525,22 @@ export default function EventList() {
           </>
         )}
         {currentTab === 'archive' && (
-          renderSection("Over The Horizon", groupedEvents.archived, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective, handleQuickAddTodo)
+          // No section header — the Archive tab itself is the label.
+          renderSection("", groupedEvents.archived, expandedIds, toggleExpand, startEdit, toggleTodoCompletion, handleStatusChange, handleNextActionChange, handleDelete, handleStarToggle, showNextActions, handleConfirmDates, handlePromoteTodo, isTodoPromotedTodayEffective, handleQuickAddTodo)
         )}
         {activeFilters.length > 0 && filteredEvents.length === 0 && <div className={styles.empty}>No matching horizons</div>}
       </div>
 
+      {undoDelete && (
+        <div className={styles.undoBar} role="status">
+          <span className={styles.undoBarText}>Deleted &ldquo;{undoDelete.text}&rdquo;</span>
+          <button className={styles.undoBarButton} onClick={handleUndoDelete}>Undo</button>
+        </div>
+      )}
+
       <div className={styles.bottomButtons}>
         {(() => {
-          const exercise = rheiItems.find(r => r.text === 'Exercise');
+          const exercise = findWorkoutItem(rheiItems);
           const isMarked = exercise
             ? isRheiEngagedTodayEffective(exercise.id)
             : workedOutFallback === todayStr;
@@ -2419,7 +2647,7 @@ function renderSection(
                   <span className={`${styles.eventName} ${isArchived ? styles.archivedName : ""}`}>{event.name}</span>
                   {showNextActions && (() => {
                     const trimmedNextAction = event.nextAction?.trim() || "";
-                    const fallbackTodo = !trimmedNextAction ? event.todos?.find(t => !t.completed)?.text : undefined;
+                    const fallbackTodo = !trimmedNextAction ? event.todos?.find(t => !t.completed && !t.archivedAt)?.text : undefined;
                     return (
                       <div className={styles.nextActionRow}>
                         {(trimmedNextAction || fallbackTodo) && <span className={styles.nextActionHyphen}>–</span>}
@@ -2470,10 +2698,10 @@ function renderSection(
                     )}
                     <p className={styles.descText}>{event.description}</p>
 
-                    {((event.todos || []).length > 0 || !isArchived) && (
+                    {((event.todos || []).some(t => !t.archivedAt) || !isArchived) && (
                       <div className={styles.todoListDisplay}>
                         <div className={styles.todoListTitle}>Tasks</div>
-                        {(event.todos || []).map(todo => (
+                        {(event.todos || []).filter(t => !t.archivedAt).map(todo => (
                           <div
                             key={todo.id}
                             className={`${styles.todoItem} ${isTodoPromoted(todo.id) ? styles.todoPromoted : ""}`}

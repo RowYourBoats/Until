@@ -41,6 +41,26 @@
   opacity: 0.7;
 }
 
+.syncPrompt {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* Raised when a save POST fails (server down / non-2xx): the change is safe in
+   localStorage but hasn't reached disk. Stays until a write gets through. */
+.persistWarning {
+  font-size: 0.85rem;
+  color: var(--accent-red);
+}
+.persistWarning + .syncStatus {
+  margin-left: 0.6em;
+}
+
 /* Sync hides in plain sight: it sits with the other header actions and works
    normally, but its label is invisible (text matches the background) so only
    someone who knows it's there will click it. A faint hover reveal keeps it
@@ -1363,4 +1383,62 @@
   margin-left: 6px;
   opacity: 0.4;
   vertical-align: middle;
+}
+
+/* Archived group (Repeating items, project subtasks): hidden-but-kept, restorable */
+.archivedGroup {
+  margin-top: 0.667rem;
+}
+
+.archivedRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 4px 0;
+  color: var(--text-secondary);
+}
+
+.archivedText {
+  opacity: 0.6;
+}
+
+.archivedMeta {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+/* Undo bar after deleting a daily task */
+.undoBar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 1rem;
+  background: var(--foreground);
+  color: var(--background);
+  border-radius: 4px;
+  z-index: 50;
+}
+
+.undoBarText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.undoBarButton {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  flex-shrink: 0;
 }

@@ -16,8 +16,8 @@ Each section below describes one surface: how it behaves, what a normal session 
 |---|---|---|
 | Over The Horizon | Past due | Yes |
 | Short Horizon | 0–15 days | Yes |
-| Horizon | 16–180 days | No |
-| Long Horizon | 180+ days | No |
+| Horizon | 16–45 days | No |
+| Long Horizon | 46+ days | No (own collapsible header, independent of Fold) |
 
 **What it's for.** Most calendars treat time as a grid of slots. Horizons treats it as a landscape: things approach, pass overhead, or drift past unattended. The bands keep the imminent visible and the distant from crowding it out — without forcing you to delete or hide anything.
 
@@ -39,7 +39,7 @@ Each section below describes one surface: how it behaves, what a normal session 
 
 This is the system being honest about which overdue work you're actually carrying versus which has fallen off the map. Most overdue work in most systems is invisible. Here it's three distinct states of forgotten-ness.
 
-**Folded mode.** Click `Fold` in the tab row to hide the `Horizon` and `Long Horizon` sections, leaving only OTH and Short. This is the "what matters this fortnight" view. Hold **Space** to peek at the folded sections; double-tap **Space** to lock them open or shut. Fold state persists across reload.
+**Folded mode.** The `Horizon` section is open by default. Click `Fold` in the tab row to hide it, leaving only OTH and Short — the "what matters this fortnight" view. Hold **Space** to peek at the folded section; double-tap **Space** to lock it open or shut. `Long Horizon` has its own collapsible header, folded by default.
 
 ---
 
@@ -59,6 +59,7 @@ The name *Rhei* is from the Greek *panta rhei* — everything flows. The state k
 4. **Sub-tasks.** Once engaged, an `Add sub-task…` input appears under the item. Type something one-off (`finished chapter 4`, `cleaned brushes`) and press Enter. Sub-tasks are scoped to today and also appear in the Today tab.
 5. **Scheduled sub-tasks.** Edit a Repeating item (pencil icon) to attach weekday-specific sub-tasks — for example, "stretch shoulders" only on Mon/Wed/Fri. When you engage the item on a matching weekday, today's scheduled sub-tasks are created automatically. They appear as dimmed previews during the 2.5-second pending window so you can see what's about to be committed.
 6. **Disengaging.** Tap the engaged item again to disengage. Same 2.5-second undo window.
+7. **Retiring a practice.** Edit the item and choose **Archive**. It moves to a collapsed Archived group with its history intact, and can be restored any time. Deleting permanently is a separate, deliberate step from inside the archive, because the point of Repeating is the record.
 
 **Why the undo window exists.** Daily engagement tracking only works if the data is trustworthy. A single mis-tap polluting a month of history makes the record useless. The silent 2.5-second debounce means the dataset reflects deliberate choices, not finger slips. Repeating prioritizes long-term truthfulness over instant durability.
 
@@ -75,7 +76,7 @@ The name *Rhei* is from the Greek *panta rhei* — everything flows. The state k
 1. Type into the input and press Enter to add a task to whichever day's tab is active.
 2. **Click the task** (no checkbox) to toggle completion. Completed tasks collapse under a `Completed` header — click it to expand.
 3. **Link a task to a horizon** with the link icon. The task gets a `linkedEventId`; the horizon shows the task in its sub-list.
-4. **Carry forward.** When yesterday has unchecked tasks, today shows a button to bring them in. Carrying records `carriedFrom` so the lineage of an undone task is preserved.
+4. **Carry forward.** When yesterday has unchecked tasks, today shows a button to bring them in. Carrying is a *ledger move*: the original stays on its day as a dimmed "carried forward" record, and a fresh copy lands on today. `carriedFrom` records the chain's origin, `carriedTo` the successor — so an undone task's whole lineage is preserved, and "carried (still alive)" stays distinct from "deleted."
 5. **Tomorrow tab.** Drafts for the next day — type anything you've already decided about tomorrow so it's there when you wake up.
 6. **Repeating tab.** Switches to the Repeating list (see above). It lives in the same tab row because in practice you flip between today's loose tasks and your standing practices constantly.
 
@@ -169,7 +170,7 @@ The shape of the bottom bar is intentional: the three things you owe a working d
 
 ## Folded peek
 
-**Hold Space** to peek at the `Horizon` and `Long Horizon` sections while in folded mode. Release to collapse. **Double-tap Space** to lock folded/unfolded.
+**Hold Space** to peek at the `Horizon` section while in folded mode. Release to collapse. **Double-tap Space** to lock folded/unfolded.
 
 Same logic as the next-action peek: a brief look without committing.
 
@@ -193,7 +194,7 @@ Toggle **Day** / **Night** in the header. CSS variables drive a full light/dark 
 
 A flag in the codebase (`isPersonal = !process.env.NEXT_PUBLIC_VERCEL_ENV`) is `true` when you run Until locally and `false` on the Vercel deployment. It's currently unused at the UI level — both versions look the same — but it's available for future branching.
 
-The public Vercel deployment is **read-only** at runtime. It serves a tracked seed (`data-example/`) of fictional but plausible content so visitors see a realistic, populated UI. Nothing visitors do persists between cold starts. Locally, real `data/` files take over and the seed is invisible.
+The public Vercel deployment has a **read-only** filesystem — it never writes to disk and is a pure Google Drive client: the owner signs in and syncs, while a visitor sees an empty, local-only app (and can't sync — OAuth is org-internal). The `data-example/` demo seed is served only when `NEXT_PUBLIC_UNTIL_DEMO=1`, which is off by default. See [Architecture](./Architecture.md) for the full sync model.
 
 ---
 
@@ -204,7 +205,7 @@ A few things Until intentionally doesn't do:
 - **No deadlines as alerts.** Nothing pings you. Horizons surface by approaching, not by interrupting.
 - **No streaks.** Repeating tracks engagement history but never shames you for a break.
 - **No scoring.** No productivity score, no per-day rating, no graphs of your worth.
-- **No multi-user.** This is a single-user tool for a working life. Sharing is via the public Vercel snapshot, not by giving anyone an account.
+- **No multi-user.** This is a single-user tool for a working life. Your devices share one Google Drive file; there are no accounts for anyone else. Showing the app off is done with a separate, populated demo deployment, not by sharing your data.
 - **No required fields.** A horizon needs a name and a due date. Everything else — description, tags, todos, next action — is optional and arrives as the work reveals itself.
 
 The shape is closer to a field journal than a task tracker. The point isn't to capture every intention; it's to keep an honest, daily contact with the work you've actually committed to.

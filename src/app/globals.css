@@ -62,15 +62,24 @@ body {
   transition: background 0.3s ease, color 0.3s ease;
 }
 
-/* Desktop letterbox: dark surround when the centered container is narrower than the viewport. Mobile (single column) keeps body color so iOS chrome tints to match the app. */
-@media (min-width: 600px) {
+/* Desktop letterbox: dark surround when the centered container is meaningfully narrower than the viewport. Windows barely wider than the 540px container (snapped/near-fit) stay body-colored so no sliver bars appear; mobile keeps body color so iOS chrome tints to match the app. */
+@media (min-width: 720px) {
   body {
     background: #293c64;
   }
+}
 
-  /* Fluid root size — anchors 27" 4K (~2560 CSS px @ 150% scaling) to 16px and shrinks toward 14px at 1920 (16" 4K @ 200% scaling). Every rem in the app follows. */
+@media (min-width: 600px) {
+  /* Fluid root size — continuous across the 600px boundary: 16px at 600, easing to 14px at 1920 (16" 4K @ 200% scaling). Every rem in the app follows. */
   html {
-    font-size: clamp(13px, calc(0.3125vw + 8px), 17px);
+    font-size: clamp(14px, calc(16.91px - 0.1515vw), 16px);
+  }
+}
+
+/* ≥1920 the original curve takes over: 14px at 1920, 16px at 2560 (27" 4K @ 150% scaling), capped at 17px */
+@media (min-width: 1920px) {
+  html {
+    font-size: clamp(14px, calc(0.3125vw + 8px), 17px);
   }
 }
 

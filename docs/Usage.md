@@ -27,8 +27,8 @@ Horizons are projects or commitments with due dates. They're automatically sorte
 |---------|-------|------------------------|
 | Over The Horizon | Past due | Yes |
 | Short Horizon | 0 -- 15 days | Yes |
-| Horizon | 16 -- 180 days | No |
-| Long Horizon | 180+ days | No |
+| Horizon | 16 -- 45 days | No |
+| Long Horizon | 46+ days | No (own collapsible header, independent of Fold) |
 
 **Adding a horizon:** Click `New` in the tab row. Fill in name, due date, and optionally a URL, next action, description, to-do items, and tags. Click `New` again (now `×`) to cancel.
 
@@ -58,7 +58,7 @@ Below the filter bar:
 |--------|--------|
 | `On-going` / `Archive` | Switch between active horizons and the archive |
 | `New` (`×` while open) | Open / cancel the new-horizon form |
-| `Fold` / `Unfold` | Hide or show the `Horizon` and `Long Horizon` sections (state persists across tab/window blur) |
+| `Fold` / `Unfold` | Hide or show the `Horizon` section (open by default; `Long Horizon` has its own collapsible header) |
 
 ## Daily Tasks
 
@@ -67,7 +67,9 @@ Switch between **Yesterday**, **Today**, **Tomorrow**, and **Repeating** tabs.
 - Type in the input and press Enter to add a task.
 - Click a task to toggle completion (no checkbox needed).
 - Link a task to a horizon using the link icon.
-- **Carry forward:** When unchecked tasks remain from yesterday, a button appears to bring them into today.
+- **Delete with undo:** the X deletes a task and shows an **Undo** bar at the bottom for a few seconds. Deleted tasks are kept as hidden records for a year before being erased.
+- **Carry forward:** When unchecked tasks remain from yesterday, a button appears to bring them into today. The original stays on its day as a dimmed "carried forward" record (a ledger), so the history of what moved is preserved; a fresh copy lands on today.
+- **Sync:** On startup, use **Sign in & sync** to connect this session, or choose **Later** to keep working locally. The prompt disappears after a successful sync. The Sync button stays visible until connected, then becomes camouflaged. After a first manual sync, the app also syncs silently every hour while open. The header shows `Syncing…` during either kind of sync and a local timestamp such as `Synced 10/12 12:34AM` after success. Older time-only records show `(date unknown)` until the next successful sync. If automatic sync fails, it shows `Auto-sync paused — press Sync`; press Sync to reconnect. See [Architecture](./Architecture.md#sync--devices).
 - **Completed group:** Completed tasks collapse under a `Completed` header. Click the header to expand/collapse.
 
 ## Repeating (Rhei)
@@ -79,6 +81,9 @@ Repeating items are recurring practices you want to engage with daily.
 - **Sub-tasks:** When engaged, an `Add sub-task...` input appears. Type a one-off sub-task and press Enter. Sub-tasks are scoped to today.
 - **Scheduled sub-tasks:** Repeating items can have weekday-specific sub-tasks (configured via the edit pencil). When you engage the item, today's scheduled sub-tasks are created automatically. During the 2.5-second pending window they appear as dimmed previews.
 - Sub-tasks also appear in the Today tab, but the parent Repeating item itself stays only in the Repeating tab.
+- **Renaming is safe.** Renaming an item (edit pencil) carries its past taps and sub-tasks along, so nothing resurfaces as an unchecked task. If you rename the item the **Worked Out** button logs to, the button follows it.
+- **Archive, don't delete.** The edit pencil has an **Archive** button. An archived item leaves the active list but keeps its full engagement history. It waits in a collapsed **Archived (n)** group at the bottom of the tab, showing the last day you engaged it.
+- From the Archived group you can **Restore** an item, or **Delete permanently** (two-step confirm). Permanent delete is the only way an item's history is erased.
 
 ## Pomodoro Timer
 
@@ -105,6 +110,8 @@ For each horizon, you can:
 - Read and edit the description
 - Update the next action
 - Check off or add to-do items (todos record `createdAt` and `completedAt`)
+
+In a horizon's edit form, the X next to a to-do item **archives** it rather than removing it. Archived items are hidden from the card, the Pomodoro picker and Gardening, and are listed under a collapsed **Archived (n)** group in the edit form with **Restore** and **Delete permanently**. Changes apply when you save the form.
 - **Save & Next** to commit changes, or **Skip** to move on
 
 The Garden button strikes through once every active horizon has been reviewed today.
@@ -140,6 +147,6 @@ Toggle between light and dark mode using the **Day** / **Night** button in the h
 
 ## Personal vs. public version
 
-The codebase exposes an `isPersonal` flag (`!process.env.NEXT_PUBLIC_VERCEL_ENV`) that is `true` locally and `false` on Vercel. It's currently unused at the UI level — both versions look the same — but kept available for future per-version branching. The Vercel deployment is read-only at runtime; data writes do not persist between cold starts.
+`isPersonal` (`!process.env.NEXT_PUBLIC_VERCEL_ENV`) is `true` locally and `false` on Vercel. The Vercel deployment has a read-only filesystem and never writes to disk — it's a pure Google Drive client (the owner signs in and syncs; a visitor sees an empty local-only app and can't sync, since OAuth is org-internal).
 
-When the local `data/` directory is empty (as on Vercel), the API routes fall back to a tracked `data-example/` folder containing fictional but plausible content. Visitors see a working, populated UI; nothing they do persists.
+The bundled `data-example/` demo seed is served **only** on a deployment with `NEXT_PUBLIC_UNTIL_DEMO=1` — off by default, so the real app starts empty. See [Architecture](./Architecture.md) for the sync model, env vars, and how to stand up a separate populated demo.

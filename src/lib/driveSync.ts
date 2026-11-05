@@ -35,8 +35,8 @@ function mergeAll(local: AllDatasets, remote: AllDatasets): AllDatasets {
   };
 }
 
-export async function syncWithDrive(local: AllDatasets, persist?: Persist): Promise<AllDatasets> {
-  const token = await getAccessToken(true);
+export async function syncWithDrive(local: AllDatasets, persist?: Persist, interactive = true): Promise<AllDatasets> {
+  const token = await getAccessToken(interactive);
   const { id } = await findOrCreateDataFile(token);
 
   // Retry on a concurrent write: if the file's revision changed between our read

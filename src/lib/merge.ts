@@ -36,9 +36,10 @@ export function mergeById<T extends Mergeable>(a: T[], b: T[]): T[] {
 /**
  * Drop tombstones older than `days`. Run on the source-of-truth side after a merge
  * so storage stays bounded; any device that deleted within the window has already
- * propagated the deletion.
+ * propagated the deletion. The window is a year so a mistaken delete stays
+ * recoverable from the JSON for a long time; storage cost is negligible.
  */
-export function purgeTombstones<T extends Mergeable>(items: T[], days = 30): T[] {
+export function purgeTombstones<T extends Mergeable>(items: T[], days = 365): T[] {
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
   return items.filter((item) => {
     if (!item.deletedAt) return true;
