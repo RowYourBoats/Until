@@ -32,8 +32,8 @@ export function useDriveSync() {
         setNeedsLogin(false);
       } catch (e) {
         setNeedsLogin(true);
-        // A silent (hourly) attempt failing is expected once the ~1h Google token
-        // lapses — point at the button instead of raising an alarm.
+        // A silent (startup/hourly) attempt fails when this device isn't signed in
+        // (or, without server auth, once the ~1h token lapses) — point at the button.
         setStatus(interactive
           ? `Sync failed — ${(e as Error).message || "sign-in or network"}`
           : "Auto-sync paused — press Sync");

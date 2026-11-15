@@ -7,8 +7,11 @@
  * `until-data.json` holding all four datasets. The PC, MacBook and iPhone all hit
  * the same file, so Drive is the hub and any device can sync from anywhere.
  *
- * Access tokens last ~1h with no refresh token, so we re-request on each sync;
- * always call from a user gesture (the Sync click) so Safari allows the popup.
+ * Auth: when the server has GOOGLE_CLIENT_SECRET, sign-in is a one-time redirect
+ * per device and the server keeps a refresh token in an httpOnly cookie (see
+ * src/app/api/auth/*), so later syncs — including the silent hourly one — never
+ * prompt. Without the secret we fall back to the GIS popup token (~1h, no refresh
+ * token, must come from a user gesture).
  */
 
 import { loadLocal, saveLocal, LS_KEYS } from "@/lib/localStore";
@@ -73,6 +76,35 @@ export function loadGis(): Promise<void> {
 export async function getAccessToken(interactive = true): Promise<string> {
   if (cachedToken && cachedToken.expiresAt - 60_000 > Date.now()) return cachedToken.token;
   if (!CLIENT_ID) throw new Error("Missing NEXT_PUBLIC_GOOGLE_CLIENT_ID");
+
+  // Preferred path: the server holds a refresh token (httpOnly cookie) and mints
+  // a fresh access token with no popup — survives reloads and the hourly timer.
+  // 501 = server has no GOOGLE_CLIENT_SECRET; fall back to the popup-only flow.
+  let serverAuth = true;
+  try {
+    const r = await fetch("/api/auth/token", { cache: "no-store" });
+    if (r.ok) {
+      const j = await r.json();
+      cachedToken = { token: j.access_token, expiresAt: Date.now() + (j.expires_in ?? 3600) * 1000 };
+      return j.access_token;
+    }
+    if (r.status === 501) serverAuth = false;
+  } catch {
+    // offline or no server — try the browser flow below
+    serverAuth = false;
+  }
+  if (serverAuth) {
+    if (!interactive) throw new Error("not signed in");
+    // One-time per device: full-page redirect to Google, back to /?signedIn=1.
+    window.location.assign("/api/auth/login");
+    throw new Error("redirecting to Google sign-in");
+  }
+
+  return getBrowserToken(interactive);
+}
+
+/** Legacy popup-only token (no refresh token; ~1h, lost on reload). */
+async function getBrowserToken(interactive: boolean): Promise<string> {
   await loadGis();
   const google = (window as any).google;
   if (!tokenClient) {

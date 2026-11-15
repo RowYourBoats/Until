@@ -548,9 +548,9 @@ export default function EventList() {
     return runDriveSync(local, persist, apply, interactive);
   };
 
-  // Hourly auto-sync. Silent (no consent popup): Google tokens last ~1h with no
-  // refresh token, so this mostly rides the session from the last manual Sync and
-  // skips quietly when that lapses. Devices that never synced (demo, visitors)
+  // Hourly auto-sync. Silent (no popup): with server auth the refresh-token cookie
+  // mints a fresh token each time; without it this rides the ~1h popup token and
+  // skips quietly once it lapses. Devices that never synced (demo, visitors)
   // have no lastSync stamp and are left alone.
   const handleSyncRef = useRef(handleSync);
   handleSyncRef.current = handleSync;
@@ -560,6 +560,23 @@ export default function EventList() {
       handleSyncRef.current(false);
     }, 60 * 60 * 1000);
     return () => clearInterval(id);
+  }, []);
+
+  // Startup: returning from Google sign-in (?signedIn=1 / ?authError=…), or any
+  // device that has synced before, gets a silent sync — the server-held refresh
+  // token makes this work without a prompt. Short delay lets the mount-time
+  // localStorage/API seeding land first.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const signedIn = params.has('signedIn');
+    const authError = params.get('authError');
+    if (signedIn || authError) window.history.replaceState(null, '', window.location.pathname);
+    if (authError) { setSyncStatus(`Sign-in failed — ${authError}`); return; }
+    if (!canSignIn) return;
+    if (!signedIn && !loadLocal<string | null>(LS_KEYS.lastSync, null)) return;
+    const t = setTimeout(() => handleSyncRef.current(false), 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Each save: stamp changed items, commit to React state + localStorage (so the
@@ -1781,7 +1798,7 @@ export default function EventList() {
 
       {mounted && canSignIn && needsLogin && !syncPromptDismissed && (
         <div className={styles.syncPrompt} role="status">
-          <span>Sign in and sync to start hourly syncing for this session.</span>
+          <span>Sign in once on this device to turn on hourly syncing.</span>
           <button className={styles.textBtn} onClick={() => handleSync()} disabled={syncing}>
             {syncing ? 'Syncing…' : 'Sign in & sync'}
           </button>
