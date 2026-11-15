@@ -32,8 +32,8 @@ The Vercel deployment has a read-only filesystem (`PERSIST_DISABLED`) and never 
 The four datasets (~260 KB of text) sync across devices (PC, MacBook, iPhone) through one **`until-data.json` in Google Drive**.
 
 - **How it syncs.** Each device edits offline against its localStorage mirror. Pressing **Sync** does a Drive round-trip: read `until-data.json`, merge it with the local snapshot per item (last-write-wins, `src/lib/merge.ts`), then write the result back. Local state is adopted only *after* the write succeeds, so a clobbered write never loses data. Concurrent writes are guarded by re-checking the file's `headRevisionId` and retrying.
-- **Sync is manual, with an hourly silent retry.** Each page session starts with a dismissible **Sign in & sync** prompt when Google sign-in is configured (excluding demo deployments). Its button triggers Google sign-in from a user click and runs a sync; success hides the prompt. On devices that have synced at least once, a background timer also syncs every hour while the page is open (the timer restarts when the page reloads). Automatic attempts use silent sign-in (no consent popup). Both manual and hourly sync show `Syncing…` in the header, then persist a full ISO timestamp and display its local month/day and time, such as `Synced 10/12 12:34AM`. Legacy time-only records display `(date unknown)` until replaced by a successful sync. Failed automatic attempts show `Auto-sync paused — press Sync` and leave the saved last-success time unchanged. Changes made during a sync are preserved locally for the next sync.
-- **Auth.** Browser-side Google Identity Services, scope `drive.file` (the app only ever sees the one file it created). No client secret. Access is gated by the OAuth consent screen's **Internal** audience (or Testing mode) — only the owner's account can sign in, so a visitor can't sync.
+- **Sync is manual, with an hourly silent retry.** A device that hasn't signed in shows a dismissible **Sign in & sync** prompt when Google sign-in is configured (excluding demo deployments). Its button triggers Google sign-in from a user click and runs a sync; success hides the prompt. On devices that have synced at least once, a silent sync also runs on page load and every hour while the page is open. Automatic attempts use silent sign-in (no consent popup). Both manual and hourly sync show `Syncing…` in the header, then persist a full ISO timestamp and display its local month/day and time, such as `Synced 10/12 12:34AM`. Legacy time-only records display `(date unknown)` until replaced by a successful sync. Failed automatic attempts show `Auto-sync paused — press Sync` and leave the saved last-success time unchanged. Changes made during a sync are preserved locally for the next sync.
+- **Auth.** Scope `drive.file` (the app only ever sees the one file it created). **Sign in once per device:** Sync redirects to Google (`/api/auth/login` → `/api/auth/callback`), and the server stores the resulting refresh token in an httpOnly cookie. Every later sync — startup, hourly, after reloads — gets a fresh access token from `/api/auth/token` with no prompt. Stateless (no disk), so it works on Vercel. If the server has no `GOOGLE_CLIENT_SECRET`, it falls back to the old browser-only GIS popup token (~1h, lost on reload). Access is gated by the OAuth consent screen's **Internal** audience (or Testing mode) — only the owner's account can sign in, so a visitor can't sync.
 - **The PC is special.** Only the PC materializes `data/*.json` and reconciles `/projects/`, via `POST /api/sync`. It's flagged `NEXT_PUBLIC_UNTIL_PC=1`; the phone/MacBook sync to Drive only.
 - **Deployed app = pure Drive client.** On a deployed instance the client never overwrites local data from the server — it refreshes from `/api` only to seed a dataset that's empty locally (`isPersonal` gate in `EventList` mount). The PC, with authoritative `data/`, always refreshes.
 - **The iPhone uses the Vercel app** over public HTTPS + Drive — no PC running, no LAN, no certificates. The deployment is `noindex`'d (`src/app/robots.ts` + layout metadata).
@@ -72,10 +72,11 @@ pm2 restart until    # after rebuilding — required for NEXT_PUBLIC_* changes
 
 ### Environment variables
 
-See `.env.example`. All are `NEXT_PUBLIC_` (browser-readable, none secret):
+See `.env.example`. All but `GOOGLE_CLIENT_SECRET` are `NEXT_PUBLIC_` (browser-readable, none secret):
 
 | Variable | Where | Purpose |
 |----------|-------|---------|
+| `GOOGLE_CLIENT_SECRET` | every instance that syncs (Vercel env + PC `.env.local`). **Secret — server-only.** | Lets the server hold a refresh token so devices stay signed in |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | every instance that syncs (Vercel + each device's `.env.local`) | OAuth web client ID for Drive sign-in |
 | `NEXT_PUBLIC_UNTIL_PC` | PC's `.env.local` only (`=1`) | Marks the instance that persists `data/*.json` + reconciles `/projects/` |
 | `NEXT_PUBLIC_UNTIL_DEMO` | a throwaway demo deployment only (`=1`) | Serve the `data-example/` seed. Leave UNSET on the real app. Never sign in / sync on a demo instance — it would push demo data into your Drive. |
@@ -84,8 +85,10 @@ See `.env.example`. All are `NEXT_PUBLIC_` (browser-readable, none secret):
 
 1. Google Cloud project → enable the **Google Drive API**.
 2. **OAuth consent screen:** audience **Internal** (Workspace org — only your `@m-a-r-v-i-n.com` account works) or **External + Testing** with your account as a test user. Add scope `drive.file`. Don't publish.
-3. **Credentials → OAuth client ID → Web application.** Authorized JS origins: `https://until-ashy.vercel.app` and `http://localhost:3000`. No redirect URIs (token client uses postMessage). The client secret is unused — ignore it.
-4. Put the client ID in `NEXT_PUBLIC_GOOGLE_CLIENT_ID` everywhere; set `NEXT_PUBLIC_UNTIL_PC=1` on the PC only.
+3. **Credentials → OAuth client ID → Web application.** Authorized JS origins: `https://until-ashy.vercel.app` and `http://localhost:3000`. Authorized redirect URIs: `https://until-ashy.vercel.app/api/auth/callback` and `http://localhost:3000/api/auth/callback`.
+4. Put the client ID in `NEXT_PUBLIC_GOOGLE_CLIENT_ID` and the client secret in `GOOGLE_CLIENT_SECRET` everywhere; set `NEXT_PUBLIC_UNTIL_PC=1` on the PC only.
+
+> Keep the audience **Internal**: in External + Testing mode Google expires refresh tokens after 7 days, so you'd re-sign-in weekly.
 
 > The Drive file `until-data.json` is created automatically on first Sync (root of My Drive). Do the very first sync on a single device, then the others, to avoid a duplicate-file race.
 
